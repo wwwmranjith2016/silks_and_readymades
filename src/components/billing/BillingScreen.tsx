@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import JsBarcode from 'jsbarcode';
+import SampleReceipt from './SampleReceipt';
 
 interface CartItem {
   product_id: number;
@@ -21,6 +22,8 @@ const BillingScreen: React.FC = () => {
   const [customerPhone, setCustomerPhone] = useState('');
   const [processing, setProcessing] = useState(false);
   const [lastScan, setLastScan] = useState('');
+  const [printerStatus, setPrinterStatus] = useState<any>(null);
+  const [showReceiptPreview, setShowReceiptPreview] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Barcode scanner listener
@@ -46,6 +49,25 @@ const BillingScreen: React.FC = () => {
       (window as any).electron.barcode.removeScanListener(handleBarcodeScan);
     };
   }, [cart]);
+
+  // Load printer status
+  useEffect(() => {
+    const loadPrinterStatus = async () => {
+      try {
+        const result = await (window as any).electron.printer.getStatus();
+        if (result.success) {
+          setPrinterStatus(result.data);
+        }
+      } catch (error) {
+        console.error('Error loading printer status:', error);
+      }
+    };
+
+    loadPrinterStatus();
+    // Refresh printer status every 5 seconds
+    const interval = setInterval(loadPrinterStatus, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Search products
   const handleSearch = async (query: string) => {
@@ -113,6 +135,53 @@ const BillingScreen: React.FC = () => {
   const discountAmount = (subtotal * discountPercent) / 100;
   const total = subtotal - discountAmount;
 
+  // Generate preview data for sample receipt
+  const generatePreviewData = () => {
+    const billNumber = 'BILL-' + Date.now().toString().slice(-6);
+    return {
+      bill_number: billNumber,
+      bill_date: new Date().toISOString(),
+      customer_name: customerName || null,
+      customer_phone: customerPhone || null,
+      subtotal: subtotal,
+      discount_amount: discountAmount,
+      discount_percentage: discountPercent,
+      total_amount: total,
+      payment_mode: paymentMode,
+      paid_amount: total,
+      balance_amount: 0,
+      items: cart.map(item => ({
+        product_id: item.product_id,
+        product_name: item.product_name,
+        barcode: item.barcode,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        total_price: item.total_price
+      }))
+    };
+  };
+
+  // Print bill
+  const printBill = async (billData: any) => {
+    if (!printerStatus?.connected) {
+      console.log('Printer not connected, skipping print');
+      return { success: true, message: 'Bill created (not printed - printer not connected)' };
+    }
+
+    try {
+      const printResult = await (window as any).electron.printer.printBill(billData);
+      if (printResult.success) {
+        return { success: true, message: 'Bill created and printed successfully' };
+      } else {
+        console.error('Print failed:', printResult.error);
+        return { success: true, message: 'Bill created (print failed: ' + printResult.error + ')' };
+      }
+    } catch (error) {
+      console.error('Print error:', error);
+      return { success: true, message: 'Bill created (print error: ' + error + ')' };
+    }
+  };
+
   // Process bill
   const handleProcessBill = async () => {
     if (cart.length === 0) {
@@ -146,11 +215,17 @@ const BillingScreen: React.FC = () => {
       const result = await (window as any).electron.bills.create(billData);
 
       if (result.success) {
-        alert(`Bill ${result.billNumber} created successfully!`);
+        // Add bill date and items to bill data for printing
+        const billForPrint = {
+          ...billData,
+          bill_number: result.billNumber,
+          bill_date: new Date().toISOString()
+        };
+
+        // Print the bill
+        const printResult = await printBill(billForPrint);
         
-        // Print bill (we'll add this later)
-        // For now, just show bill details
-        console.log('Bill created:', result);
+        alert(`${printResult.message}! Bill: ${result.billNumber}`);
 
         // Clear cart
         setCart([]);
@@ -179,8 +254,15 @@ const BillingScreen: React.FC = () => {
               ✓ Scanned: {lastScan}
             </div>
           )}
-          <div className="text-sm">
+          <div className="text-sm flex items-center gap-2">
             📷 Scanner Ready
+            <span className={`px-2 py-1 rounded text-xs ${
+              printerStatus?.connected 
+                ? 'bg-green-100 text-green-800' 
+                : 'bg-red-100 text-red-800'
+            }`}>
+              {printerStatus?.connected ? '🖨️ Printer Ready' : '🖨️ Printer Offline'}
+            </span>
           </div>
         </div>
       </div>
@@ -367,7 +449,14 @@ const BillingScreen: React.FC = () => {
               disabled={cart.length === 0 || processing}
               className="w-full py-4 bg-green-600 text-white rounded-lg font-bold text-lg hover:bg-green-700 disabled:bg-gray-400"
             >
-              {processing ? 'Processing...' : 'PRINT BILL'}
+              {processing ? 'Processing...' : 'CREATE & PRINT BILL'}
+            </button>
+            <button
+              onClick={() => setShowReceiptPreview(true)}
+              disabled={cart.length === 0}
+              className="w-full py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400"
+            >
+              👁️ Preview Receipt
             </button>
             <button
               onClick={() => {
@@ -383,6 +472,54 @@ const BillingScreen: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Receipt Preview Modal */}
+      {showReceiptPreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-auto">
+            <div className="p-4 border-b">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-bold">Receipt Preview</h2>
+                <button
+                  onClick={() => setShowReceiptPreview(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            <div className="p-4">
+              <SampleReceipt 
+                billData={generatePreviewData()}
+                shopInfo={{
+                  shop_name: 'Silks & Readymades',
+                  owner_name: 'Retail Store',
+                  address: '123 Main Street, City, State 12345',
+                  phone: '+91 9876543210'
+                }}
+              />
+            </div>
+            <div className="p-4 border-t bg-gray-50">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    window.print();
+                  }}
+                  className="flex-1 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  🖨️ Print Preview
+                </button>
+                <button
+                  onClick={() => setShowReceiptPreview(false)}
+                  className="flex-1 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

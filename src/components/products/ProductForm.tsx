@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import JsBarcode from 'jsbarcode';
+import { useToast } from '../common/ToastContext';
 
 interface ProductFormProps {
   onSuccess: () => void;
@@ -25,6 +26,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ onSuccess, onCancel, editProd
 
   const [barcodeImage, setBarcodeImage] = useState('');
   const [loading, setLoading] = useState(false);
+  const { showToast } = useToast();
 
   useEffect(() => {
     if (editProduct) {
@@ -57,7 +59,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ onSuccess, onCancel, editProd
         generateBarcodeImage(result.barcode, formData.barcode_type);
       }
     } catch (error) {
-      alert('Error generating barcode: ' + error);
+      showToast('Error generating barcode: ' + error, 'error');
     }
   };
 
@@ -88,7 +90,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ onSuccess, onCancel, editProd
     e.preventDefault();
     
     if (!formData.product_name || !formData.barcode || !formData.selling_price) {
-      alert('Please fill in all required fields');
+      showToast('Please fill in all required fields', 'warning');
       return;
     }
 
@@ -111,13 +113,13 @@ const ProductForm: React.FC<ProductFormProps> = ({ onSuccess, onCancel, editProd
       }
 
       if (result.success) {
-        alert(result.message);
+        showToast(result.message, 'success');
         onSuccess();
       } else {
-        alert('Error: ' + result.error);
+        showToast('Error: ' + result.error, 'error');
       }
     } catch (error) {
-      alert('Error saving product: ' + error);
+      showToast('Error saving product: ' + error, 'error');
     } finally {
       setLoading(false);
     }

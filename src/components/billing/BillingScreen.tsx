@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import JsBarcode from 'jsbarcode';
 import SampleReceipt from './SampleReceipt';
+import { useToast } from '../common/ToastContext';
 
 interface CartItem {
   product_id: number;
@@ -25,10 +25,11 @@ const BillingScreen: React.FC = () => {
   const [printerStatus, setPrinterStatus] = useState<any>(null);
   const [showReceiptPreview, setShowReceiptPreview] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const { showToast } = useToast();
 
   // Barcode scanner listener
   useEffect(() => {
-    const handleBarcodeScan = async (event: any, data: { barcode: string }) => {
+    const handleBarcodeScan = async (_event: any, data: { barcode: string }) => {
       console.log('Barcode scanned:', data.barcode);
       setLastScan(data.barcode);
       
@@ -39,7 +40,7 @@ const BillingScreen: React.FC = () => {
         // Flash feedback
         setTimeout(() => setLastScan(''), 2000);
       } else {
-        alert('Product not found for barcode: ' + data.barcode);
+        showToast('Product not found for barcode: ' + data.barcode, 'error');
       }
     };
 
@@ -186,7 +187,7 @@ const BillingScreen: React.FC = () => {
   // Process bill
   const handleProcessBill = async () => {
     if (cart.length === 0) {
-      alert('Cart is empty!');
+      showToast('Cart is empty!', 'warning');
       return;
     }
 
@@ -227,7 +228,7 @@ const BillingScreen: React.FC = () => {
         const printResult = await printBill(billForPrint);
         console.log("printResult:", printResult.message);
         
-        // alert(`${printResult.message}! Bill: ${result.billNumber}`);
+        showToast(`${printResult.message}! Bill: ${result.billNumber}`, 'success');
 
         // Clear cart
         setCart([]);
@@ -240,10 +241,10 @@ const BillingScreen: React.FC = () => {
         setShowSearchResults(false); // ← Add this
         console.log('Cart and search cleared after bill processing.');
       } else {
-        alert('Error creating bill: ' + result.error);
+        showToast('Error creating bill: ' + result.error, 'error');
       }
     } catch (error) {
-      alert('Error: ' + error);
+      showToast('Error: ' + error, 'error');
     } finally {
       setProcessing(false);
     }

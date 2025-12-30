@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useToast } from '../common/ToastContext';
 
 const PrinterSettings: React.FC = () => {
   const [availablePrinters, setAvailablePrinters] = useState<any[]>([]);
@@ -6,6 +7,7 @@ const PrinterSettings: React.FC = () => {
   const [printerStatus, setPrinterStatus] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
+  const { showToast } = useToast();
 
   useEffect(() => {
     loadAvailablePrinters();
@@ -48,14 +50,14 @@ const PrinterSettings: React.FC = () => {
       const result = await (window as any).electron.printer.initialize(printerName);
       if (result.success) {
         localStorage.setItem('thermalPrinterName', printerName);
-        alert('Printer connected successfully!');
+        showToast('Printer connected successfully!', 'success');
         loadPrinterStatus();
       } else {
-        alert('Failed to connect to printer: ' + result.error);
+        showToast('Failed to connect to printer: ' + result.error, 'error');
         setSelectedPrinter('');
       }
     } catch (error) {
-      alert('Error connecting to printer: ' + error);
+      showToast('Error connecting to printer: ' + error, 'error');
       setSelectedPrinter('');
     } finally {
       setLoading(false);
@@ -64,7 +66,7 @@ const PrinterSettings: React.FC = () => {
 
   const handleTestConnection = async () => {
     if (!selectedPrinter) {
-      alert('Please select a printer first');
+      showToast('Please select a printer first', 'warning');
       return;
     }
 
@@ -72,12 +74,12 @@ const PrinterSettings: React.FC = () => {
     try {
       const result = await (window as any).electron.printer.testConnection();
       if (result.success) {
-        alert('Printer connection test successful!');
+        showToast('Printer connection test successful!', 'success');
       } else {
-        alert('Printer connection test failed: ' + result.error);
+        showToast('Printer connection test failed: ' + result.error, 'error');
       }
     } catch (error) {
-      alert('Error testing printer connection: ' + error);
+      showToast('Error testing printer connection: ' + error, 'error');
     } finally {
       setTesting(false);
     }
@@ -85,7 +87,7 @@ const PrinterSettings: React.FC = () => {
 
   const printTestPage = async () => {
     if (!selectedPrinter) {
-      alert('Please select a printer first');
+      showToast('Please select a printer first', 'warning');
       return;
     }
 
@@ -121,12 +123,12 @@ const PrinterSettings: React.FC = () => {
     try {
       const result = await (window as any).electron.printer.printBill(testBillData);
       if (result.success) {
-        alert('Test page printed successfully!');
+        showToast('Test page printed successfully!', 'success');
       } else {
-        alert('Failed to print test page: ' + result.error);
+        showToast('Failed to print test page: ' + result.error, 'error');
       }
     } catch (error) {
-      alert('Error printing test page: ' + error);
+      showToast('Error printing test page: ' + error, 'error');
     }
   };
 

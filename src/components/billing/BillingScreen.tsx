@@ -253,7 +253,7 @@ const BillingScreen: React.FC = () => {
   return (
     <div className="h-screen flex flex-col bg-gray-100">
       {/* Header */}
-      <div className="bg-blue-600 text-white p-4 flex justify-between items-center">
+      <div className="p-4 flex justify-between items-center">
         <h1 className="text-2xl font-bold">New Bill</h1>
         <div className="flex items-center gap-4">
           {lastScan && (

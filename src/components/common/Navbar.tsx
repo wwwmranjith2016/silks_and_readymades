@@ -11,6 +11,7 @@ const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
     { id: 'billing', label: 'New Bill', icon: '🧾' },
     { id: 'products', label: 'Products', icon: '📦' },
     { id: 'bills', label: 'Bills History', icon: '📋' },
+    { id: 'reports', label: 'Reports', icon: '📈' },
     { id: 'sample-receipt', label: 'Sample Receipt', icon: '👁️' },
     { id: 'settings', label: 'Settings', icon: '⚙️' },
   ];

@@ -4,6 +4,7 @@ import Dashboard from './components/dashboard/Dashboard';
 import BillingScreen from './components/billing/BillingScreen';
 import ProductList from './components/products/ProductList';
 import BillsHistory from './components/bills/BillsHistory';
+import Reports from './components/reports/Reports';
 import PrinterSettings from './components/settings/PrinterSettings';
 import SampleReceiptPage from './pages/SampleReceiptPage';
 import { ToastProvider } from './components/common/ToastContext';
@@ -21,6 +22,8 @@ function App() {
         return <ProductList />;
       case 'bills':
         return <BillsHistory />;
+      case 'reports':
+        return <Reports />;
       case 'settings':
         return <PrinterSettings />;
       case 'sample-receipt':

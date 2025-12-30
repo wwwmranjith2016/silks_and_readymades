@@ -36,8 +36,82 @@ async function createWindow() {
   // Initialize thermal printer
   thermalPrinter = new ThermalPrinter();
 
+  // Add sample data if database is empty
+  await addSampleData();
+
   // Setup IPC handlers
   setupIPCHandlers();
+
+  // Add sample data if needed
+  async function addSampleData() {
+    try {
+      // Check if we have any products
+      const existingProducts = dbManager.all('SELECT COUNT(*) as count FROM products WHERE is_active = 1');
+      
+      if (existingProducts[0].count === 0) {
+        console.log('Adding sample products...');
+        
+        // Add sample products with stock
+        const sampleProducts = [
+          {
+            product_name: 'Black Pant',
+            category: 'Clothing',
+            selling_price: 899,
+            stock_quantity: 36,
+            min_stock_level: 10
+          },
+          {
+            product_name: 'Blue Shirt',
+            category: 'Clothing', 
+            selling_price: 599,
+            stock_quantity: 15,
+            min_stock_level: 8
+          },
+          {
+            product_name: 'White Sneakers',
+            category: 'Footwear',
+            selling_price: 1299,
+            stock_quantity: 5,
+            min_stock_level: 12
+          },
+          {
+            product_name: 'Coffee Mug',
+            category: 'Home & Kitchen',
+            selling_price: 299,
+            stock_quantity: 0,
+            min_stock_level: 20
+          },
+          {
+            product_name: 'Notebook',
+            category: 'Stationery',
+            selling_price: 150,
+            stock_quantity: 45,
+            min_stock_level: 15
+          }
+        ];
+
+        for (const product of sampleProducts) {
+          // Generate a simple barcode
+          const barcode = 'SB' + Date.now() + Math.floor(Math.random() * 1000);
+          
+          dbManager.run(
+            `INSERT INTO products (barcode, product_name, category, selling_price, stock_quantity, min_stock_level)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [barcode, product.product_name, product.category, product.selling_price, product.stock_quantity, product.min_stock_level]
+          );
+        }
+        
+        console.log('Sample products added successfully');
+        
+        // Save database
+        const path = require('path');
+        const dbPath = path.join(app.getPath('userData'), 'billing.db');
+        dbManager.saveDatabase(dbPath);
+      }
+    } catch (error) {
+      console.error('Error adding sample data:', error);
+    }
+  }
 
   // Load app
   mainWindow.loadURL('http://localhost:5173');
@@ -498,6 +572,162 @@ function setupIPCHandlers() {
             credit_sales: 0
           },
           topItems: topItems || []
+        }
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Sales report by date range
+  ipcMain.handle('reports:salesByDateRange', async (event, startDate, endDate) => {
+    try {
+      // Total sales
+      const summary = dbManager.get(
+        `SELECT 
+          COUNT(*) as total_bills,
+          SUM(total_amount) as total_sales,
+          SUM(CASE WHEN payment_mode = 'CASH' THEN total_amount ELSE 0 END) as cash_sales,
+          SUM(CASE WHEN payment_mode = 'UPI' THEN total_amount ELSE 0 END) as upi_sales,
+          SUM(CASE WHEN payment_mode = 'CARD' THEN total_amount ELSE 0 END) as card_sales,
+          SUM(CASE WHEN payment_mode = 'CREDIT' THEN total_amount ELSE 0 END) as credit_sales
+         FROM bills 
+         WHERE DATE(bill_date) >= DATE(?) AND DATE(bill_date) <= DATE(?)`,
+        [startDate, endDate]
+      );
+
+      // Top selling items
+      const topItems = dbManager.all(
+        `SELECT 
+          bi.product_name,
+          SUM(bi.quantity) as total_quantity,
+          SUM(bi.total_price) as total_amount
+         FROM bill_items bi
+         JOIN bills b ON bi.bill_id = b.bill_id
+         WHERE DATE(b.bill_date) >= DATE(?) AND DATE(b.bill_date) <= DATE(?)
+         GROUP BY bi.product_name
+         ORDER BY total_quantity DESC
+         LIMIT 10`,
+        [startDate, endDate]
+      );
+
+      return { 
+        success: true, 
+        data: {
+          summary: summary || {
+            total_bills: 0,
+            total_sales: 0,
+            cash_sales: 0,
+            upi_sales: 0,
+            card_sales: 0,
+            credit_sales: 0
+          },
+          topItems: topItems || []
+        }
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Inventory report
+  ipcMain.handle('reports:inventoryReport', async () => {
+    try {
+      // Get all products
+      const allProducts = dbManager.all('SELECT product_id, product_name, stock_quantity, min_stock_level, category, selling_price FROM products WHERE is_active = 1 ORDER BY product_name');
+      console.log('All products:', allProducts);
+
+      // Low stock products
+      const lowStockProducts = dbManager.all(
+        `SELECT product_id, product_name, stock_quantity, min_stock_level, category
+         FROM products 
+         WHERE is_active = 1 
+         AND stock_quantity <= min_stock_level 
+         AND stock_quantity > 0
+         ORDER BY stock_quantity ASC`
+      );
+
+      console.log('Low stock products:', lowStockProducts);
+
+      // Out of stock products
+      const outOfStockProducts = dbManager.all(
+        `SELECT product_id, product_name, category
+         FROM products 
+         WHERE is_active = 1 
+         AND stock_quantity = 0
+         ORDER BY product_name`
+      );
+
+      console.log('Out of stock products:', outOfStockProducts);
+
+      return {
+        success: true,
+        data: {
+          allProducts: allProducts || [],
+          lowStockProducts: lowStockProducts || [],
+          outOfStockProducts: outOfStockProducts || []
+        }
+      };
+    } catch (error) {
+      console.error('Inventory report error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Financial report
+  ipcMain.handle('reports:financialReport', async (event, startDate, endDate) => {
+    try {
+      // Get sales data for the period
+      const salesData = dbManager.get(
+        `SELECT 
+          SUM(total_amount) as total_revenue,
+          COUNT(*) as total_bills,
+          AVG(total_amount) as average_bill_value
+         FROM bills 
+         WHERE DATE(bill_date) >= DATE(?) AND DATE(bill_date) <= DATE(?)`,
+        [startDate, endDate]
+      );
+
+      // Calculate previous period for comparison
+      const startDateObj = new Date(startDate);
+      const endDateObj = new Date(endDate);
+      const periodDays = Math.ceil((endDateObj - startDateObj) / (1000 * 60 * 60 * 24)) + 1;
+      
+      const prevStartDate = new Date(startDateObj.getTime() - (periodDays * 24 * 60 * 60 * 1000))
+        .toISOString().split('T')[0];
+      const prevEndDate = new Date(endDateObj.getTime() - (periodDays * 24 * 60 * 60 * 1000))
+        .toISOString().split('T')[0];
+
+      const previousPeriodData = dbManager.get(
+        `SELECT SUM(total_amount) as total_revenue
+         FROM bills 
+         WHERE DATE(bill_date) >= DATE(?) AND DATE(bill_date) <= DATE(?)`,
+        [prevStartDate, prevEndDate]
+      );
+
+      // Calculate profit (simplified - assuming 30% margin)
+      const totalRevenue = salesData?.total_revenue || 0;
+      const totalProfit = totalRevenue * 0.3; // 30% profit margin assumption
+      const totalTax = totalRevenue * 0.05; // 5% tax assumption
+
+      const currentPeriod = totalRevenue;
+      const previousPeriod = previousPeriodData?.total_revenue || 0;
+      const growthPercentage = previousPeriod > 0 
+        ? ((currentPeriod - previousPeriod) / previousPeriod) * 100 
+        : 0;
+
+      return {
+        success: true,
+        data: {
+          totalRevenue,
+          totalProfit,
+          totalTax,
+          averageBillValue: salesData?.average_bill_value || 0,
+          periodComparison: {
+            currentPeriod,
+            previousPeriod,
+            growthPercentage
+          }
         }
       };
     } catch (error) {

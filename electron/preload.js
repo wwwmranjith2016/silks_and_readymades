@@ -60,4 +60,12 @@ contextBridge.exposeInMainWorld('electron', {
     getStatus: () => ipcRenderer.invoke('printer:getStatus'),
     printBill: (billData) => ipcRenderer.invoke('printer:printBill', billData),
   },
+
+  // Label Printing API
+  label: {
+    print: (productData, labelSettings) => ipcRenderer.invoke('label:print', productData, labelSettings),
+    printBulk: (productsData, labelSettings) => ipcRenderer.invoke('label:printBulk', productsData, labelSettings),
+    getSizes: () => ipcRenderer.invoke('label:getSizes'),
+    getTemplates: () => ipcRenderer.invoke('label:getTemplates'),
+  },
 });

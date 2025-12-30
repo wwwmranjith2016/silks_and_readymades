@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import ProductForm from './ProductForm';
+import LabelPrint from '../common/LabelPrint';
 import { useToast } from '../common/ToastContext';
 
 const ProductList: React.FC = () => {
@@ -8,6 +9,8 @@ const ProductList: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [editProduct, setEditProduct] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showLabelPrint, setShowLabelPrint] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -68,16 +71,23 @@ const ProductList: React.FC = () => {
     loadProducts();
   };
 
+  const handlePrintLabel = (product: any) => {
+    setSelectedProduct(product);
+    setShowLabelPrint(true);
+  };
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Products</h1>
-        <button
-          onClick={() => setShowForm(true)}
-          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-        >
-          + Add Product
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowForm(true)}
+            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+          >
+            + Add Product
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -144,6 +154,12 @@ const ProductList: React.FC = () => {
                       Edit
                     </button>
                     <button
+                      onClick={() => handlePrintLabel(product)}
+                      className="text-green-600 hover:text-green-800 mr-3"
+                    >
+                      Print Label
+                    </button>
+                    <button
                       onClick={() => handleDelete(product.product_id)}
                       className="text-red-600 hover:text-red-800"
                     >
@@ -168,6 +184,19 @@ const ProductList: React.FC = () => {
           editProduct={editProduct}
         />
       )}
+
+      {/* Label Print Modal */}
+      {showLabelPrint && selectedProduct && (
+        <LabelPrint
+          product={selectedProduct}
+          onClose={() => {
+            setShowLabelPrint(false);
+            setSelectedProduct(null);
+          }}
+        />
+      )}
+
+
     </div>
   );
 };

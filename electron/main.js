@@ -208,6 +208,183 @@ function setupIPCHandlers() {
       return { success: false, error: error.message };
     }
   });
+// ===== BILLS HANDLERS =====
+  
+  // Create bill
+  ipcMain.handle('bills:create', async (event, billData) => {
+    try {
+      // Get shop info for bill number
+      const shopInfo = dbManager.get('SELECT * FROM shop_info WHERE shop_id = 1');
+      const billNumber = `${shopInfo.bill_prefix}-${shopInfo.bill_counter.toString().padStart(4, '0')}`;
+      
+      // Insert bill
+      dbManager.run(
+        `INSERT INTO bills (
+          bill_number, customer_id, customer_name, customer_phone,
+          subtotal, discount_amount, discount_percentage, total_amount,
+          payment_mode, paid_amount, balance_amount, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          billNumber,
+          billData.customer_id || null,
+          billData.customer_name || null,
+          billData.customer_phone || null,
+          billData.subtotal,
+          billData.discount_amount || 0,
+          billData.discount_percentage || 0,
+          billData.total_amount,
+          billData.payment_mode || 'CASH',
+          billData.paid_amount || billData.total_amount,
+          billData.balance_amount || 0,
+          billData.notes || null
+        ]
+      );
+
+      // Get the inserted bill ID
+      const bill = dbManager.get('SELECT * FROM bills WHERE bill_number = ?', [billNumber]);
+
+      // Insert bill items
+      for (const item of billData.items) {
+        dbManager.run(
+          `INSERT INTO bill_items (
+            bill_id, product_id, product_name, product_code, barcode,
+            quantity, unit_price, total_price
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            bill.bill_id,
+            item.product_id,
+            item.product_name,
+            item.product_code || null,
+            item.barcode || null,
+            item.quantity,
+            item.unit_price,
+            item.total_price
+          ]
+        );
+      }
+
+      // Save database
+      const path = require('path');
+      const dbPath = path.join(app.getPath('userData'), 'billing.db');
+      dbManager.saveDatabase(dbPath);
+
+      return { 
+        success: true, 
+        message: 'Bill created successfully',
+        billNumber: billNumber,
+        billId: bill.bill_id
+      };
+    } catch (error) {
+      console.error('Bill creation error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Get bill by ID with items
+  ipcMain.handle('bills:getById', async (event, id) => {
+    try {
+      const bill = dbManager.get('SELECT * FROM bills WHERE bill_id = ?', [id]);
+      if (bill) {
+        const items = dbManager.all('SELECT * FROM bill_items WHERE bill_id = ?', [id]);
+        bill.items = items;
+      }
+      return { success: true, data: bill };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Get today's bills
+  ipcMain.handle('bills:getToday', async () => {
+    try {
+      const bills = dbManager.all(
+        `SELECT * FROM bills 
+         WHERE DATE(bill_date) = DATE('now')
+         ORDER BY bill_date DESC`
+      );
+      return { success: true, data: bills };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Get all bills with filters
+  ipcMain.handle('bills:getAll', async (event, filters = {}) => {
+    try {
+      let sql = 'SELECT * FROM bills WHERE 1=1';
+      const params = [];
+
+      if (filters.startDate) {
+        sql += ' AND DATE(bill_date) >= DATE(?)';
+        params.push(filters.startDate);
+      }
+
+      if (filters.endDate) {
+        sql += ' AND DATE(bill_date) <= DATE(?)';
+        params.push(filters.endDate);
+      }
+
+      sql += ' ORDER BY bill_date DESC LIMIT 100';
+
+      const bills = dbManager.all(sql, params);
+      return { success: true, data: bills };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Get daily sales summary
+  ipcMain.handle('reports:dailySales', async (event, date) => {
+    try {
+      const targetDate = date || new Date().toISOString().split('T')[0];
+      
+      // Total sales
+      const summary = dbManager.get(
+        `SELECT 
+          COUNT(*) as total_bills,
+          SUM(total_amount) as total_sales,
+          SUM(CASE WHEN payment_mode = 'CASH' THEN total_amount ELSE 0 END) as cash_sales,
+          SUM(CASE WHEN payment_mode = 'UPI' THEN total_amount ELSE 0 END) as upi_sales,
+          SUM(CASE WHEN payment_mode = 'CARD' THEN total_amount ELSE 0 END) as card_sales,
+          SUM(CASE WHEN payment_mode = 'CREDIT' THEN total_amount ELSE 0 END) as credit_sales
+         FROM bills 
+         WHERE DATE(bill_date) = DATE(?)`,
+        [targetDate]
+      );
+
+      // Top selling items
+      const topItems = dbManager.all(
+        `SELECT 
+          bi.product_name,
+          SUM(bi.quantity) as total_quantity,
+          SUM(bi.total_price) as total_amount
+         FROM bill_items bi
+         JOIN bills b ON bi.bill_id = b.bill_id
+         WHERE DATE(b.bill_date) = DATE(?)
+         GROUP BY bi.product_name
+         ORDER BY total_quantity DESC
+         LIMIT 10`,
+        [targetDate]
+      );
+
+      return { 
+        success: true, 
+        data: {
+          summary: summary || {
+            total_bills: 0,
+            total_sales: 0,
+            cash_sales: 0,
+            upi_sales: 0,
+            card_sales: 0,
+            credit_sales: 0
+          },
+          topItems: topItems || []
+        }
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
 }
 
 app.whenReady().then(() => {

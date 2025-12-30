@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import ProductForm from './ProductForm';
+import { useToast } from '../common/ToastContext';
 
 const ProductList: React.FC = () => {
   const [products, setProducts] = useState<any[]>([]);
@@ -7,6 +8,7 @@ const ProductList: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [editProduct, setEditProduct] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const { showToast } = useToast();
 
   useEffect(() => {
     loadProducts();
@@ -20,7 +22,7 @@ const ProductList: React.FC = () => {
         setProducts(result.data);
       }
     } catch (error) {
-      alert('Error loading products: ' + error);
+      showToast('Error loading products: ' + error, 'error');
     } finally {
       setLoading(false);
     }
@@ -34,7 +36,7 @@ const ProductList: React.FC = () => {
           setProducts(result.data);
         }
       } catch (error) {
-        alert('Error searching: ' + error);
+        showToast('Error searching: ' + error, 'error');
       }
     } else {
       loadProducts();
@@ -46,10 +48,11 @@ const ProductList: React.FC = () => {
       try {
         const result = await (window as any).electron.products.delete(id);
         if (result.success) {
+          showToast('Product deleted successfully', 'success');
           loadProducts();
         }
       } catch (error) {
-        alert('Error deleting product: ' + error);
+        showToast('Error deleting product: ' + error, 'error');
       }
     }
   };

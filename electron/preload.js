@@ -51,4 +51,13 @@ contextBridge.exposeInMainWorld('electron', {
     get: (key) => ipcRenderer.invoke('settings:get', key),
     set: (key, value) => ipcRenderer.invoke('settings:set', key, value),
   },
+  
+  // Thermal Printer API
+  printer: {
+    getAvailable: () => ipcRenderer.invoke('printer:getAvailable'),
+    initialize: (printerName) => ipcRenderer.invoke('printer:initialize', printerName),
+    testConnection: () => ipcRenderer.invoke('printer:testConnection'),
+    getStatus: () => ipcRenderer.invoke('printer:getStatus'),
+    printBill: (billData) => ipcRenderer.invoke('printer:printBill', billData),
+  },
 });

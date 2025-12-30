@@ -2,10 +2,12 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const DatabaseManager = require('./database/db/db.js');
 const BarcodeGenerator = require('./barcode/barcode-generator');
+const ThermalPrinter = require('./thermal-printer/thermal-printer');
 
 let mainWindow;
 let dbManager;
 let barcodeGenerator;
+let thermalPrinter;
 
 async function createWindow() {
   mainWindow = new BrowserWindow({
@@ -30,6 +32,9 @@ async function createWindow() {
 
   // Initialize barcode generator
   barcodeGenerator = new BarcodeGenerator();
+
+  // Initialize thermal printer
+  thermalPrinter = new ThermalPrinter();
 
   // Setup IPC handlers
   setupIPCHandlers();
@@ -208,6 +213,62 @@ function setupIPCHandlers() {
       return { success: false, error: error.message };
     }
   });
+
+  // ===== THERMAL PRINTER HANDLERS =====
+  
+  // Get available printers
+  ipcMain.handle('printer:getAvailable', async () => {
+    try {
+      const result = await thermalPrinter.getAvailablePrinters();
+      return result;
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Initialize printer
+  ipcMain.handle('printer:initialize', async (event, printerName) => {
+    try {
+      const result = await thermalPrinter.initialize(printerName);
+      return result;
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Test printer connection
+  ipcMain.handle('printer:testConnection', async () => {
+    try {
+      const result = await thermalPrinter.testConnection();
+      return result;
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Get printer status
+  ipcMain.handle('printer:getStatus', async () => {
+    try {
+      const status = thermalPrinter.getStatus();
+      return { success: true, data: status };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Print bill
+  ipcMain.handle('printer:printBill', async (event, billData) => {
+    try {
+      // Get shop info for bill template
+      const shopInfo = dbManager.get('SELECT * FROM shop_info WHERE shop_id = 1');
+      
+      const result = await thermalPrinter.printBill(billData, shopInfo);
+      return result;
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
 // ===== BILLS HANDLERS =====
   
   // Create bill

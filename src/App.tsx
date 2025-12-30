@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Navbar from './components/common/Navbar';
 import Dashboard from './components/dashboard/Dashboard';
 import BillingScreen from './components/billing/BillingScreen';
@@ -6,6 +6,7 @@ import ProductList from './components/products/ProductList';
 import BillsHistory from './components/bills/BillsHistory';
 import PrinterSettings from './components/settings/PrinterSettings';
 import SampleReceiptPage from './pages/SampleReceiptPage';
+import { ToastProvider } from './components/common/ToastContext';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -30,10 +31,12 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Navbar currentPage={currentPage} onNavigate={setCurrentPage} />
-      {renderPage()}
-    </div>
+    <ToastProvider>
+      <div className="min-h-screen bg-gray-100">
+        <Navbar currentPage={currentPage} onNavigate={setCurrentPage} />
+        {renderPage()}
+      </div>
+    </ToastProvider>
   );
 }
 

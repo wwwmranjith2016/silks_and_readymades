@@ -55,6 +55,22 @@ function setupIPCHandlers() {
     return barcodeGenerator.generateUniqueBarcode(dbManager, category);
   });
 
+  // Generate barcode image
+  ipcMain.handle('barcode:generateImage', async (event, value, type = 'CODE128') => {
+    try {
+      // This will be handled in the renderer process using jsbarcode
+      // Return the barcode data for client-side generation
+      return {
+        success: true,
+        barcode: value,
+        type: type,
+        message: 'Barcode data prepared for client-side generation'
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
   // ===== PRODUCT HANDLERS =====
   
   // Get all products
@@ -264,6 +280,48 @@ function setupIPCHandlers() {
       
       const result = await thermalPrinter.printBill(billData, shopInfo);
       return result;
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // ===== LABEL PRINTING HANDLERS =====
+  
+  // Print single label
+  ipcMain.handle('label:print', async (event, productData, labelSettings) => {
+    try {
+      const result = await thermalPrinter.printLabel(productData, labelSettings);
+      return result;
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Print multiple labels (bulk printing)
+  ipcMain.handle('label:printBulk', async (event, productsData, labelSettings) => {
+    try {
+      const result = await thermalPrinter.printLabels(productsData, labelSettings);
+      return result;
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Get available label sizes
+  ipcMain.handle('label:getSizes', async () => {
+    try {
+      const sizes = thermalPrinter.getLabelSizes();
+      return { success: true, data: sizes };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Get available label templates
+  ipcMain.handle('label:getTemplates', async () => {
+    try {
+      const templates = thermalPrinter.getLabelTemplates();
+      return { success: true, data: templates };
     } catch (error) {
       return { success: false, error: error.message };
     }

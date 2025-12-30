@@ -43,6 +43,9 @@ contextBridge.exposeInMainWorld('electron', {
   // Reports API
   reports: {
     dailySales: (date) => ipcRenderer.invoke('reports:dailySales', date),
+    salesByDateRange: (startDate, endDate) => ipcRenderer.invoke('reports:salesByDateRange', startDate, endDate),
+    inventoryReport: () => ipcRenderer.invoke('reports:inventoryReport'),
+    financialReport: (startDate, endDate) => ipcRenderer.invoke('reports:financialReport', startDate, endDate),
     stockReport: () => ipcRenderer.invoke('reports:stockReport'),
   },
   

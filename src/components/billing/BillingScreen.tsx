@@ -107,9 +107,10 @@ const BillingScreen: React.FC = () => {
     }
 
     // Clear search
+    setSearchResults([]);
     setSearchQuery('');
     setShowSearchResults(false);
-    searchInputRef.current?.focus();
+    searchInputRef.current?.focus();  
   };
 
   // Update quantity
@@ -224,8 +225,9 @@ const BillingScreen: React.FC = () => {
 
         // Print the bill
         const printResult = await printBill(billForPrint);
+        console.log("printResult:", printResult.message);
         
-        alert(`${printResult.message}! Bill: ${result.billNumber}`);
+        // alert(`${printResult.message}! Bill: ${result.billNumber}`);
 
         // Clear cart
         setCart([]);
@@ -233,6 +235,10 @@ const BillingScreen: React.FC = () => {
         setCustomerName('');
         setCustomerPhone('');
         setPaymentMode('CASH');
+        setSearchQuery('');        // ← Add this
+        setSearchResults([]);      // ← Add this  
+        setShowSearchResults(false); // ← Add this
+        console.log('Cart and search cleared after bill processing.');
       } else {
         alert('Error creating bill: ' + result.error);
       }
@@ -277,7 +283,8 @@ const BillingScreen: React.FC = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
-              onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
+              // onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
+              onFocus={() => searchQuery.length >= 2 && searchResults.length > 0 && setShowSearchResults(true)}
               placeholder="Search product by name, barcode, or scan barcode..."
               className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
               autoFocus

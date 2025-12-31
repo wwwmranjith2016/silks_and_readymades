@@ -173,6 +173,9 @@ const BillsHistory: React.FC = () => {
                   Amount
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                  Type
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
                   Actions
                 </th>
               </tr>
@@ -208,6 +211,24 @@ const BillsHistory: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 text-right font-semibold">
                     {formatCurrency(bill.total_amount)}
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    {bill.is_return ? (
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="px-2 py-1 rounded text-xs font-semibold bg-purple-100 text-purple-800">
+                          RETURN
+                        </span>
+                        {bill.original_bill_id && (
+                          <span className="text-xs text-gray-500">
+                            of #{bill.original_bill_id}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-800">
+                        SALE
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-center">
                     <button

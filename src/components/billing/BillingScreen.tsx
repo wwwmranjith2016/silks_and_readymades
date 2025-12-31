@@ -459,23 +459,31 @@ const BillingScreen: React.FC = () => {
             >
               {processing ? 'Processing...' : 'CREATE & PRINT BILL'}
             </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setShowReceiptPreview(true)}
+                disabled={cart.length === 0}
+                className="py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400"
+              >
+                👁️ Preview
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm('Clear cart?')) {
+                    setCart([]);
+                    setDiscountPercent(0);
+                  }
+                }}
+                className="py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Clear
+              </button>
+            </div>
             <button
-              onClick={() => setShowReceiptPreview(true)}
-              disabled={cart.length === 0}
-              className="w-full py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400"
+              onClick={() => window.location.hash = '#/returns'}
+              className="w-full py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700"
             >
-              👁️ Preview Receipt
-            </button>
-            <button
-              onClick={() => {
-                if (confirm('Clear cart?')) {
-                  setCart([]);
-                  setDiscountPercent(0);
-                }
-              }}
-              className="w-full py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-            >
-              Clear Cart
+              🔄 Process Return
             </button>
           </div>
         </div>

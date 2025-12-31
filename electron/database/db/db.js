@@ -203,7 +203,30 @@ CREATE INDEX IF NOT EXISTS idx_exchange_items_return ON exchange_items(return_id
 
   // Helper method to run queries
   run(sql, params = []) {
-    return this.db.run(sql, params);
+    try {
+      // Execute the query
+      this.db.run(sql, params);
+      
+      // For INSERT operations, get the last insert ID
+      if (sql.trim().toUpperCase().startsWith('INSERT')) {
+        // Get the last insert ID using a separate query
+        const lastIdResult = this.db.exec("SELECT last_insert_rowid() as lastID");
+        if (lastIdResult.length > 0 && lastIdResult[0].values.length > 0) {
+          return {
+            lastID: lastIdResult[0].values[0][0],
+            changes: this.db.getRowsModified()
+          };
+        }
+      }
+      
+      // For other operations, return the number of changes
+      return {
+        changes: this.db.getRowsModified()
+      };
+    } catch (error) {
+      console.error('Database run error:', error);
+      throw error;
+    }
   }
 
   // Helper method to get single row
@@ -235,6 +258,38 @@ CREATE INDEX IF NOT EXISTS idx_exchange_items_return ON exchange_items(return_id
       });
     }
     return [];
+  }
+
+  // Transaction support
+  runTransaction(queries) {
+    try {
+      this.db.run('BEGIN TRANSACTION');
+      const results = [];
+      
+      for (const query of queries) {
+        const result = this.run(query.sql, query.params);
+        results.push(result);
+      }
+      
+      this.db.run('COMMIT');
+      return results;
+    } catch (error) {
+      this.db.run('ROLLBACK');
+      throw error;
+    }
+  }
+
+  // Transaction control methods
+  beginTransaction() {
+    this.db.run('BEGIN TRANSACTION');
+  }
+
+  commitTransaction() {
+    this.db.run('COMMIT');
+  }
+
+  rollbackTransaction() {
+    this.db.run('ROLLBACK');
   }
 
   close() {

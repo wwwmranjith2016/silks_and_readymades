@@ -526,6 +526,60 @@ function setupIPCHandlers() {
     }
   });
 
+  // Update bill
+  ipcMain.handle('bills:update', async (event, billId, updateData) => {
+    try {
+      // Get the current bill to calculate balance
+      const currentBill = dbManager.get('SELECT * FROM bills WHERE bill_id = ?', [billId]);
+      
+      if (!currentBill) {
+        return { success: false, error: 'Bill not found' };
+      }
+
+      // Calculate new balance based on paid amount
+      const newPaidAmount = updateData.paid_amount || currentBill.paid_amount;
+      const newBalanceAmount = currentBill.total_amount - newPaidAmount;
+
+      // Update the bill
+      dbManager.run(
+        `UPDATE bills SET 
+          customer_name = ?,
+          customer_phone = ?,
+          payment_mode = ?,
+          notes = ?,
+          paid_amount = ?,
+          balance_amount = ?
+        WHERE bill_id = ?`,
+        [
+          updateData.customer_name || null,
+          updateData.customer_phone || null,
+          updateData.payment_method || currentBill.payment_mode,
+          updateData.comment || null,
+          newPaidAmount,
+          newBalanceAmount,
+          billId
+        ]
+      );
+
+      // Save database
+      const path = require('path');
+      const dbPath = path.join(app.getPath('userData'), 'billing.db');
+      dbManager.saveDatabase(dbPath);
+
+      return { 
+        success: true, 
+        message: 'Bill updated successfully',
+        data: {
+          paid_amount: newPaidAmount,
+          balance_amount: newBalanceAmount
+        }
+      };
+    } catch (error) {
+      console.error('Bill update error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // Get daily sales summary
   ipcMain.handle('reports:dailySales', async (event, date) => {
     try {

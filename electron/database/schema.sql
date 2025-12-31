@@ -170,19 +170,31 @@ CREATE TABLE IF NOT EXISTS exchange_items (
 CREATE TRIGGER IF NOT EXISTS update_stock_on_bill_insert
 AFTER INSERT ON bill_items
 BEGIN
+    -- Only update stock for regular sales, not return exchanges
+    -- Check if this bill is NOT a return bill
     UPDATE products 
     SET stock_quantity = stock_quantity - NEW.quantity,
         updated_at = CURRENT_TIMESTAMP
-    WHERE product_id = NEW.product_id;
+    WHERE product_id = NEW.product_id
+    AND NEW.bill_id NOT IN (
+        SELECT bill_id FROM bills WHERE is_return = 1
+    );
     
+    -- Only log SALE transaction for regular sales, not returns
     INSERT INTO stock_transactions (product_id, transaction_type, quantity, reference_type, reference_id)
-    VALUES (NEW.product_id, 'SALE', -NEW.quantity, 'BILL', NEW.bill_id);
+    SELECT NEW.product_id, 'SALE', -NEW.quantity, 'BILL', NEW.bill_id
+    WHERE NEW.bill_id NOT IN (
+        SELECT bill_id FROM bills WHERE is_return = 1
+    );
 END;
 
 -- TRIGGER TO UPDATE STOCK ON RETURN ITEMS (Add back to stock)
+-- This trigger adds stock back when items are returned
 CREATE TRIGGER IF NOT EXISTS update_stock_on_return_items_insert
 AFTER INSERT ON return_items
 BEGIN
+    -- Only update stock if this is a genuine return (not a sale)
+    -- Check if this return item corresponds to a return transaction (not a sale)
     UPDATE products 
     SET stock_quantity = stock_quantity + NEW.quantity,
         updated_at = CURRENT_TIMESTAMP
@@ -193,9 +205,11 @@ BEGIN
 END;
 
 -- TRIGGER TO UPDATE STOCK ON EXCHANGE ITEMS (Remove from stock)
+-- This trigger removes stock when items are taken in exchange
 CREATE TRIGGER IF NOT EXISTS update_stock_on_exchange_items_insert
 AFTER INSERT ON exchange_items
 BEGIN
+    -- Only update stock if this is a genuine exchange
     UPDATE products 
     SET stock_quantity = stock_quantity - NEW.quantity,
         updated_at = CURRENT_TIMESTAMP
@@ -203,6 +217,21 @@ BEGIN
     
     INSERT INTO stock_transactions (product_id, transaction_type, quantity, reference_type, reference_id)
     VALUES (NEW.product_id, 'EXCHANGE', -NEW.quantity, 'RETURN', NEW.return_id);
+END;
+
+-- DEBUGGING TRIGGER: Log all stock changes
+CREATE TRIGGER IF NOT EXISTS log_stock_changes
+AFTER UPDATE OF stock_quantity ON products
+BEGIN
+    INSERT INTO stock_transactions (product_id, transaction_type, quantity, reference_type, reference_id, notes)
+    SELECT 
+        NEW.product_id,
+        'STOCK_UPDATE',
+        NEW.stock_quantity - OLD.stock_quantity,
+        'SYSTEM',
+        NULL,
+        'Auto-updated stock quantity: ' || OLD.stock_quantity || ' -> ' || NEW.stock_quantity
+    WHERE NEW.stock_quantity != OLD.stock_quantity;
 END;
 
 CREATE TRIGGER IF NOT EXISTS update_bill_counter

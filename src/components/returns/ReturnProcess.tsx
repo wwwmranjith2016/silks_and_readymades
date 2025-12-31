@@ -11,7 +11,9 @@ import {
   calculateReturnSummary, 
   validateReturnData, 
   validateStockAvailability,
-  formatCurrency 
+  formatCurrency,
+  debugReturnTransaction,
+  validateReturnDataWithLogging
 } from '../../utils/returnUtils';
 import ExchangeSelector from './ExchangeSelector';
 
@@ -150,7 +152,7 @@ const ReturnProcess: React.FC<ReturnProcessProps> = ({ onComplete, onCancel }) =
       return;
     }
 
-    const validation = validateReturnData(selectedBill.bill_id, returnItems, exchangeItems);
+    const validation = validateReturnDataWithLogging(selectedBill.bill_id, returnItems, exchangeItems);
     if (!validation.isValid) {
       showToast(validation.errors[0], 'error');
       return;
@@ -169,35 +171,64 @@ const ReturnProcess: React.FC<ReturnProcessProps> = ({ onComplete, onCancel }) =
     setProcessing(true);
 
     try {
+      // Debug logging
+      console.log('=== RETURN PROCESSING FRONTEND DEBUG ===');
+      console.log('Return items:', returnItems);
+      console.log('Exchange items:', exchangeItems);
+      console.log('Selected bill:', selectedBill);
+      
+      // Validate quantities before sending
+      const validatedReturnItems = returnItems.filter(item => item.quantity > 0);
+      const validatedExchangeItems = exchangeItems.filter(item => item.quantity > 0);
+      
+      console.log('Validated return items:', validatedReturnItems);
+      console.log('Validated exchange items:', validatedExchangeItems);
+      
+      // Double-check total calculations
+      const returnTotal = validatedReturnItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+      const exchangeTotal = validatedExchangeItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+      
+      console.log('Calculated return total:', returnTotal);
+      console.log('Calculated exchange total:', exchangeTotal);
+      console.log('Expected balance:', exchangeTotal - returnTotal);
+
       const returnData: ReturnProcessData = {
         original_bill_id: selectedBill.bill_id,
         customer_name: customerName || selectedBill.customer_name,
         customer_phone: customerPhone || selectedBill.customer_phone,
         return_reason: returnReason,
         notes: notes,
-        return_items: returnItems.map(item => ({
+        return_items: validatedReturnItems.map(item => ({
           product_id: item.product_id,
           product_name: item.product_name,
           product_code: item.product_code,
           barcode: item.barcode,
           quantity: item.quantity,
           unit_price: item.unit_price,
-          total_price: item.total_price
+          total_price: item.quantity * item.unit_price // Recalculate to ensure accuracy
         })),
-        exchange_items: exchangeItems.map(item => ({
+        exchange_items: validatedExchangeItems.map(item => ({
           product_id: item.product_id,
           product_name: item.product_name,
           product_code: item.product_code,
           barcode: item.barcode,
           quantity: item.quantity,
           unit_price: item.unit_price,
-          total_price: item.total_price
+          total_price: item.quantity * item.unit_price // Recalculate to ensure accuracy
         }))
       };
+      
+      console.log('Final return data to send:', JSON.stringify(returnData, null, 2));
+      
+      // Debug the complete transaction
+      debugReturnTransaction(returnData);
+      
+      console.log('=== END FRONTEND DEBUG ===');
 
       await onComplete(returnData);
       showToast('Return processed successfully!', 'success');
     } catch (error) {
+      console.error('Return processing error:', error);
       showToast('Error processing return: ' + error, 'error');
     } finally {
       setProcessing(false);

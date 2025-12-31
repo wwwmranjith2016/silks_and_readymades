@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('electron', {
     getAll: (filters) => ipcRenderer.invoke('bills:getAll', filters),
     getById: (id) => ipcRenderer.invoke('bills:getById', id),
     getToday: () => ipcRenderer.invoke('bills:getToday'),
+    update: (id, data) => ipcRenderer.invoke('bills:update', id, data),
   },
   
   // Customers API

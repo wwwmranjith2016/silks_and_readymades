@@ -415,8 +415,9 @@ function setupIPCHandlers() {
         `INSERT INTO bills (
           bill_number, customer_id, customer_name, customer_phone,
           subtotal, discount_amount, discount_percentage, total_amount,
-          payment_mode, paid_amount, balance_amount, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          payment_mode, paid_amount, balance_amount, notes,
+          is_return, original_bill_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           billNumber,
           billData.customer_id || null,
@@ -429,7 +430,9 @@ function setupIPCHandlers() {
           billData.payment_mode || 'CASH',
           billData.paid_amount || billData.total_amount,
           billData.balance_amount || 0,
-          billData.notes || null
+          billData.notes || null,
+          billData.is_return || 0,
+          billData.original_bill_id || null
         ]
       );
 
@@ -521,6 +524,45 @@ function setupIPCHandlers() {
 
       const bills = dbManager.all(sql, params);
       return { success: true, data: bills };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Search bills
+  ipcMain.handle('bills:search', async (event, query) => {
+    try {
+      let sql = `
+        SELECT b.*
+        FROM bills b
+        WHERE (
+          b.bill_number LIKE ? OR 
+          b.customer_name LIKE ? OR 
+          b.customer_phone LIKE ? OR 
+          CAST(b.total_amount AS TEXT) LIKE ? OR
+          DATE(b.bill_date) LIKE ?
+        )
+        ORDER BY b.bill_date DESC
+        LIMIT 50
+      `;
+      
+      const searchPattern = `%${query}%`;
+      const bills = dbManager.all(sql, [
+        searchPattern, searchPattern, searchPattern, 
+        searchPattern, searchPattern
+      ]);
+      
+      // Get items for each bill
+      const billsWithItems = [];
+      for (const bill of bills) {
+        const items = dbManager.all('SELECT * FROM bill_items WHERE bill_id = ?', [bill.bill_id]);
+        billsWithItems.push({
+          ...bill,
+          items: items
+        });
+      }
+      
+      return { success: true, data: billsWithItems };
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -784,6 +826,228 @@ function setupIPCHandlers() {
           }
         }
       };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // ===== RETURNS HANDLERS =====
+  
+  // Create return transaction
+  ipcMain.handle('returns:create', async (event, returnData) => {
+    try {
+      // Calculate totals
+      const totalReturnValue = returnData.return_items.reduce((sum, item) => sum + item.total_price, 0);
+      const totalExchangeValue = returnData.exchange_items.reduce((sum, item) => sum + item.total_price, 0);
+      const balanceAmount = totalExchangeValue - totalReturnValue;
+      
+      // Insert return transaction
+      dbManager.run(
+        `INSERT INTO return_transactions (
+          original_bill_id, customer_name, customer_phone,
+          return_reason, total_return_value, total_exchange_value,
+          balance_amount, status, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          returnData.original_bill_id,
+          returnData.customer_name || null,
+          returnData.customer_phone || null,
+          returnData.return_reason || null,
+          totalReturnValue,
+          totalExchangeValue,
+          balanceAmount,
+          'COMPLETED',
+          returnData.notes || null
+        ]
+      );
+
+      // Get the inserted return ID
+      const returnTransaction = dbManager.get(
+        'SELECT * FROM return_transactions WHERE original_bill_id = ? ORDER BY return_id DESC LIMIT 1',
+        [returnData.original_bill_id]
+      );
+
+      // Insert return items
+      for (const item of returnData.return_items) {
+        dbManager.run(
+          `INSERT INTO return_items (
+            return_id, product_id, product_name, product_code, barcode,
+            quantity, unit_price, total_price
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            returnTransaction.return_id,
+            item.product_id || null,
+            item.product_name,
+            item.product_code || null,
+            item.barcode || null,
+            item.quantity,
+            item.unit_price,
+            item.total_price
+          ]
+        );
+      }
+
+      // Insert exchange items
+      for (const item of returnData.exchange_items) {
+        dbManager.run(
+          `INSERT INTO exchange_items (
+            return_id, product_id, product_name, product_code, barcode,
+            quantity, unit_price, total_price
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            returnTransaction.return_id,
+            item.product_id || null,
+            item.product_name,
+            item.product_code || null,
+            item.barcode || null,
+            item.quantity,
+            item.unit_price,
+            item.total_price
+          ]
+        );
+      }
+
+      // Save database
+      const path = require('path');
+      const dbPath = path.join(app.getPath('userData'), 'billing.db');
+      dbManager.saveDatabase(dbPath);
+
+      return { 
+        success: true, 
+        message: 'Return processed successfully',
+        returnId: returnTransaction.return_id
+      };
+    } catch (error) {
+      console.error('Return creation error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Get all returns
+  ipcMain.handle('returns:getAll', async (event, filters = {}) => {
+    try {
+      let sql = `
+        SELECT rt.*, 
+               GROUP_CONCAT(ri.product_name) as return_item_names,
+               GROUP_CONCAT(ei.product_name) as exchange_item_names
+        FROM return_transactions rt
+        LEFT JOIN return_items ri ON rt.return_id = ri.return_id
+        LEFT JOIN exchange_items ei ON rt.return_id = ei.return_id
+        WHERE 1=1
+      `;
+      const params = [];
+
+      if (filters.startDate) {
+        sql += ' AND DATE(rt.return_date) >= DATE(?)';
+        params.push(filters.startDate);
+      }
+
+      if (filters.endDate) {
+        sql += ' AND DATE(rt.return_date) <= DATE(?)';
+        params.push(filters.endDate);
+      }
+
+      if (filters.status) {
+        sql += ' AND rt.status = ?';
+        params.push(filters.status);
+      }
+
+      sql += ' GROUP BY rt.return_id ORDER BY rt.return_date DESC LIMIT 100';
+
+      const returns = dbManager.all(sql, params);
+      
+      // Get detailed return data with items
+      const detailedReturns = [];
+      for (const returnTransaction of returns) {
+        const returnItems = dbManager.all('SELECT * FROM return_items WHERE return_id = ?', [returnTransaction.return_id]);
+        const exchangeItems = dbManager.all('SELECT * FROM exchange_items WHERE return_id = ?', [returnTransaction.return_id]);
+        
+        detailedReturns.push({
+          ...returnTransaction,
+          return_items: returnItems,
+          exchange_items: exchangeItems
+        });
+      }
+      
+      return { success: true, data: detailedReturns };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Get return by ID
+  ipcMain.handle('returns:getById', async (event, id) => {
+    try {
+      const returnTransaction = dbManager.get('SELECT * FROM return_transactions WHERE return_id = ?', [id]);
+      if (returnTransaction) {
+        const returnItems = dbManager.all('SELECT * FROM return_items WHERE return_id = ?', [id]);
+        const exchangeItems = dbManager.all('SELECT * FROM exchange_items WHERE return_id = ?', [id]);
+        
+        returnTransaction.return_items = returnItems;
+        returnTransaction.exchange_items = exchangeItems;
+      }
+      return { success: true, data: returnTransaction };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Update return status
+  ipcMain.handle('returns:updateStatus', async (event, id, status) => {
+    try {
+      dbManager.run(
+        'UPDATE return_transactions SET status = ? WHERE return_id = ?',
+        [status, id]
+      );
+
+      // Save database
+      const path = require('path');
+      const dbPath = path.join(app.getPath('userData'), 'billing.db');
+      dbManager.saveDatabase(dbPath);
+
+      return { success: true, message: 'Return status updated successfully' };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Print return receipt
+  ipcMain.handle('returns:printReceipt', async (event, returnId) => {
+    try {
+      const returnTransaction = dbManager.get('SELECT * FROM return_transactions WHERE return_id = ?', [returnId]);
+      const returnItems = dbManager.all('SELECT * FROM return_items WHERE return_id = ?', [returnId]);
+      const exchangeItems = dbManager.all('SELECT * FROM exchange_items WHERE return_id = ?', [returnId]);
+      const originalBill = dbManager.get('SELECT * FROM bills WHERE bill_id = ?', [returnTransaction.original_bill_id]);
+      const shopInfo = dbManager.get('SELECT * FROM shop_info WHERE shop_id = 1');
+      
+      if (!returnTransaction) {
+        return { success: false, error: 'Return transaction not found' };
+      }
+
+      // Create receipt data
+      const receiptData = {
+        return_number: `RET-${returnTransaction.return_id.toString().padStart(6, '0')}`,
+        return_date: returnTransaction.return_date,
+        original_bill_number: originalBill?.bill_number || 'N/A',
+        original_bill_date: originalBill?.bill_date || 'N/A',
+        customer_name: returnTransaction.customer_name || 'Walk-in Customer',
+        customer_phone: returnTransaction.customer_phone || '',
+        return_reason: returnTransaction.return_reason || '',
+        notes: returnTransaction.notes || '',
+        return_items: returnItems,
+        exchange_items: exchangeItems,
+        summary: {
+          total_return_value: returnTransaction.total_return_value,
+          total_exchange_value: returnTransaction.total_exchange_value,
+          balance_amount: returnTransaction.balance_amount,
+          balance_type: returnTransaction.balance_amount > 0 ? 'Customer Pays' : 'Customer Gets Change'
+        },
+        shop_info: shopInfo
+      };
+
+      // Print using thermal printer
+      const result = await thermalPrinter.printReturn(receiptData);
+      return result;
     } catch (error) {
       return { success: false, error: error.message };
     }

@@ -32,6 +32,16 @@ contextBridge.exposeInMainWorld('electron', {
     getById: (id) => ipcRenderer.invoke('bills:getById', id),
     getToday: () => ipcRenderer.invoke('bills:getToday'),
     update: (id, data) => ipcRenderer.invoke('bills:update', id, data),
+    search: (query) => ipcRenderer.invoke('bills:search', query),
+  },
+  
+  // Returns API
+  returns: {
+    create: (data) => ipcRenderer.invoke('returns:create', data),
+    getAll: (filters) => ipcRenderer.invoke('returns:getAll', filters),
+    getById: (id) => ipcRenderer.invoke('returns:getById', id),
+    updateStatus: (id, status) => ipcRenderer.invoke('returns:updateStatus', id, status),
+    printReceipt: (id) => ipcRenderer.invoke('returns:printReceipt', id),
   },
   
   // Customers API

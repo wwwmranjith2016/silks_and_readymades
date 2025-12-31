@@ -193,11 +193,13 @@ const LabelPrint: React.FC<LabelPrintProps> = ({ product, onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-        <div className="p-6">
-          {/* Hidden canvas for barcode generation */}
-          <canvas ref={barcodeCanvasRef} style={{ display: 'none' }} />
-          <div className="flex justify-between items-center mb-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] flex flex-col">
+        {/* Hidden canvas for barcode generation */}
+        <canvas ref={barcodeCanvasRef} style={{ display: 'none' }} />
+        
+        {/* Header - Fixed */}
+        <div className="flex-shrink-0 p-6 border-b">
+          <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold">Print Label</h2>
             <button
               onClick={onClose}
@@ -206,17 +208,22 @@ const LabelPrint: React.FC<LabelPrintProps> = ({ product, onClose }) => {
               ×
             </button>
           </div>
+        </div>
 
-          {/* Product Info */}
-          <div className="bg-gray-50 p-4 rounded-lg mb-4">
+        {/* Product Info - Fixed */}
+        <div className="flex-shrink-0 p-6 border-b">
+          <div className="bg-gray-50 p-4 rounded-lg">
             <div className="font-semibold">{product.product_name}</div>
             <div className="text-sm text-gray-600">
               {product.barcode} | ₹{product.selling_price}
             </div>
           </div>
+        </div>
 
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-6">
           {/* Label Settings */}
-          <div className="space-y-4">
+          <div className="space-y-4 mb-6">
             <div>
               <label className="block text-sm font-medium mb-2">Label Size</label>
               <select
@@ -264,7 +271,7 @@ const LabelPrint: React.FC<LabelPrintProps> = ({ product, onClose }) => {
           </div>
 
           {/* Label Preview */}
-          <div className="mt-6">
+          <div>
             <h3 className="text-sm font-medium mb-2">Label Preview ({templates.find(t => t.id === selectedTemplate)?.name})</h3>
             <div className="border-2 border-dashed border-gray-300 p-4 rounded-lg">
               {previewData && (
@@ -341,19 +348,21 @@ const LabelPrint: React.FC<LabelPrintProps> = ({ product, onClose }) => {
               Preview for {selectedLabelSize?.name || selectedSize} • {templates.find(t => t.id === selectedTemplate)?.description}
             </div>
           </div>
+        </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-2 mt-6">
+        {/* Footer with Buttons - Fixed */}
+        <div className="flex-shrink-0 p-6 border-t bg-gray-50">
+          <div className="flex gap-3">
             <button
               onClick={handlePrint}
               disabled={loading}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
             >
               {loading ? 'Printing...' : `Print ${quantity} Label${quantity > 1 ? 's' : ''}`}
             </button>
             <button
               onClick={onClose}
-              className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+              className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
             >
               Cancel
             </button>

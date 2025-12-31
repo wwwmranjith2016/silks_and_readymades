@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useToast } from '../common/ToastContext';
+import BillEditModal from './BillEditModal';
 
 const BillsHistory: React.FC = () => {
   const [bills, setBills] = useState<any[]>([]);
@@ -8,6 +9,7 @@ const BillsHistory: React.FC = () => {
   const [showBillModal, setShowBillModal] = useState(false);
   const [billDetails, setBillDetails] = useState<any>(null);
   const [loadingBillDetails, setLoadingBillDetails] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { showToast } = useToast();
 
@@ -80,6 +82,13 @@ const BillsHistory: React.FC = () => {
   const handleBillClick = (bill: any) => {
     setSelectedBill(bill);
     loadBillDetails(bill.bill_id);
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setSelectedBill(null);
+    // Reload bills to reflect any changes made
+    loadBills();
   };
 
   const formatCurrency = (amount: number) => {
@@ -163,6 +172,9 @@ const BillsHistory: React.FC = () => {
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                   Amount
                 </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -195,7 +207,22 @@ const BillsHistory: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right font-semibold">
-                    ₹{bill.total_amount.toFixed(2)}
+                    {formatCurrency(bill.total_amount)}
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedBill(bill);
+                        setShowEditModal(true);
+                      }}
+                      className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1 rounded transition-colors"
+                      title="Edit Bill"
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -327,21 +354,12 @@ const BillsHistory: React.FC = () => {
 
             {/* Modal Footer - Fixed */}
             <div className="flex-shrink-0 p-6 border-t bg-gray-50">
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end">
                 <button
                   onClick={() => setShowBillModal(false)}
                   className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
                 >
                   Close
-                </button>
-                <button
-                  onClick={() => {
-                    // TODO: Implement print bill functionality
-                    showToast('Print functionality coming soon!', 'info');
-                  }}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-                >
-                  🖨️ Print Bill
                 </button>
               </div>
             </div>
@@ -359,6 +377,16 @@ const BillsHistory: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Bill Edit Modal */}
+      {showEditModal && selectedBill && (
+        <BillEditModal
+          bill={selectedBill}
+          isOpen={showEditModal}
+          onClose={handleCloseEditModal}
+          onSuccess={loadBills}
+        />
       )}
     </div>
   );

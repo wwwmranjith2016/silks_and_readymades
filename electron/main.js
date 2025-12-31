@@ -836,81 +836,154 @@ function setupIPCHandlers() {
   // Create return transaction
   ipcMain.handle('returns:create', async (event, returnData) => {
     try {
-      // Calculate totals
-      const totalReturnValue = returnData.return_items.reduce((sum, item) => sum + item.total_price, 0);
-      const totalExchangeValue = returnData.exchange_items.reduce((sum, item) => sum + item.total_price, 0);
+      console.log('=== RETURN PROCESSING DEBUG ===');
+      console.log('Return data received:', JSON.stringify(returnData, null, 2));
+      
+      // Validate input data
+      if (!returnData.return_items || !Array.isArray(returnData.return_items)) {
+        throw new Error('Invalid return items data');
+      }
+      if (!returnData.exchange_items || !Array.isArray(returnData.exchange_items)) {
+        throw new Error('Invalid exchange items data');
+      }
+      
+      // Calculate totals with validation
+      const totalReturnValue = returnData.return_items.reduce((sum, item) => {
+        const itemTotal = item.quantity * item.unit_price;
+        console.log(`Return item: ${item.product_name}, Qty: ${item.quantity}, Unit: ${item.unit_price}, Total: ${itemTotal}`);
+        return sum + itemTotal;
+      }, 0);
+      
+      const totalExchangeValue = returnData.exchange_items.reduce((sum, item) => {
+        const itemTotal = item.quantity * item.unit_price;
+        console.log(`Exchange item: ${item.product_name}, Qty: ${item.quantity}, Unit: ${item.unit_price}, Total: ${itemTotal}`);
+        return sum + itemTotal;
+      }, 0);
+      
       const balanceAmount = totalExchangeValue - totalReturnValue;
       
-      // Insert return transaction
-      dbManager.run(
-        `INSERT INTO return_transactions (
-          original_bill_id, customer_name, customer_phone,
-          return_reason, total_return_value, total_exchange_value,
-          balance_amount, status, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          returnData.original_bill_id,
-          returnData.customer_name || null,
-          returnData.customer_phone || null,
-          returnData.return_reason || null,
-          totalReturnValue,
-          totalExchangeValue,
-          balanceAmount,
-          'COMPLETED',
-          returnData.notes || null
-        ]
-      );
-
-      // Get the inserted return ID
-      const returnTransaction = dbManager.get(
-        'SELECT * FROM return_transactions WHERE original_bill_id = ? ORDER BY return_id DESC LIMIT 1',
-        [returnData.original_bill_id]
-      );
-
-      // Insert return items
-      for (const item of returnData.return_items) {
-        dbManager.run(
-          `INSERT INTO return_items (
-            return_id, product_id, product_name, product_code, barcode,
-            quantity, unit_price, total_price
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      console.log(`Totals - Return: ${totalReturnValue}, Exchange: ${totalExchangeValue}, Balance: ${balanceAmount}`);
+      
+      // Start transaction
+      dbManager.beginTransaction();
+      
+      let returnTransaction;
+      
+      try {
+        // Insert return transaction
+        const result = dbManager.run(
+          `INSERT INTO return_transactions (
+            original_bill_id, customer_name, customer_phone,
+            return_reason, total_return_value, total_exchange_value,
+            balance_amount, status, notes
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            returnTransaction.return_id,
-            item.product_id || null,
-            item.product_name,
-            item.product_code || null,
-            item.barcode || null,
-            item.quantity,
-            item.unit_price,
-            item.total_price
+            returnData.original_bill_id,
+            returnData.customer_name || null,
+            returnData.customer_phone || null,
+            returnData.return_reason || null,
+            totalReturnValue,
+            totalExchangeValue,
+            balanceAmount,
+            'COMPLETED',
+            returnData.notes || null
           ]
         );
-      }
 
-      // Insert exchange items
-      for (const item of returnData.exchange_items) {
-        dbManager.run(
-          `INSERT INTO exchange_items (
-            return_id, product_id, product_name, product_code, barcode,
-            quantity, unit_price, total_price
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            returnTransaction.return_id,
-            item.product_id || null,
-            item.product_name,
-            item.product_code || null,
-            item.barcode || null,
-            item.quantity,
-            item.unit_price,
-            item.total_price
-          ]
+        console.log('Return transaction inserted with ID:', result.lastID);
+
+        // Get the inserted return ID
+        returnTransaction = dbManager.get(
+          'SELECT * FROM return_transactions WHERE return_id = ?',
+          [result.lastID]
         );
+
+        console.log('Return transaction created:', returnTransaction);
+
+        // Insert return items
+        for (const item of returnData.return_items) {
+          console.log('Inserting return item:', item);
+          
+          // Get current stock before return
+          const currentProduct = dbManager.get(
+            'SELECT stock_quantity FROM products WHERE product_id = ?',
+            [item.product_id]
+          );
+          
+          if (currentProduct) {
+            console.log(`Current stock for ${item.product_name}: ${currentProduct.stock_quantity}`);
+          }
+          
+          const itemResult = dbManager.run(
+            `INSERT INTO return_items (
+              return_id, product_id, product_name, product_code, barcode,
+              quantity, unit_price, total_price
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              returnTransaction.return_id,
+              item.product_id || null,
+              item.product_name,
+              item.product_code || null,
+              item.barcode || null,
+              item.quantity,
+              item.unit_price,
+              item.total_price
+            ]
+          );
+          
+          console.log('Return item inserted with ID:', itemResult.lastID);
+        }
+
+        // Insert exchange items
+        for (const item of returnData.exchange_items) {
+          console.log('Inserting exchange item:', item);
+          
+          // Get current stock before exchange
+          const currentProduct = dbManager.get(
+            'SELECT stock_quantity FROM products WHERE product_id = ?',
+            [item.product_id]
+          );
+          
+          if (currentProduct) {
+            console.log(`Current stock for ${item.product_name}: ${currentProduct.stock_quantity}`);
+          }
+          
+          const itemResult = dbManager.run(
+            `INSERT INTO exchange_items (
+              return_id, product_id, product_name, product_code, barcode,
+              quantity, unit_price, total_price
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              returnTransaction.return_id,
+              item.product_id || null,
+              item.product_name,
+              item.product_code || null,
+              item.barcode || null,
+              item.quantity,
+              item.unit_price,
+              item.total_price
+            ]
+          );
+          
+          console.log('Exchange item inserted with ID:', itemResult.lastID);
+        }
+        
+        // Commit transaction
+        dbManager.commitTransaction();
+        console.log('Return transaction committed successfully');
+        
+      } catch (error) {
+        console.error('Transaction error, rolling back:', error);
+        dbManager.rollbackTransaction();
+        throw error;
       }
 
       // Save database
       const path = require('path');
       const dbPath = path.join(app.getPath('userData'), 'billing.db');
       dbManager.saveDatabase(dbPath);
+      
+      console.log('=== RETURN PROCESSING COMPLETE ===');
 
       return { 
         success: true, 

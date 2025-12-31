@@ -220,3 +220,112 @@ export const generateReturnId = (): string => {
   const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
   return `RET-${timestamp.slice(-6)}${random}`;
 };
+
+// Debug function to log return transaction details
+export const debugReturnTransaction = (returnData: any): void => {
+  console.log('=== RETURN TRANSACTION DEBUG ===');
+  console.log('Original Bill ID:', returnData.original_bill_id);
+  console.log('Customer:', returnData.customer_name, returnData.customer_phone);
+  
+  console.log('\n--- RETURN ITEMS ---');
+  returnData.return_items.forEach((item: any, index: number) => {
+    console.log(`${index + 1}. ${item.product_name}`);
+    console.log(`   Product ID: ${item.product_id}`);
+    console.log(`   Quantity: ${item.quantity}`);
+    console.log(`   Unit Price: ₹${item.unit_price}`);
+    console.log(`   Total Price: ₹${item.total_price}`);
+    console.log(`   Barcode: ${item.barcode}`);
+  });
+  
+  console.log('\n--- EXCHANGE ITEMS ---');
+  returnData.exchange_items.forEach((item: any, index: number) => {
+    console.log(`${index + 1}. ${item.product_name}`);
+    console.log(`   Product ID: ${item.product_id}`);
+    console.log(`   Quantity: ${item.quantity}`);
+    console.log(`   Unit Price: ₹${item.unit_price}`);
+    console.log(`   Total Price: ₹${item.total_price}`);
+    console.log(`   Barcode: ${item.barcode}`);
+  });
+  
+  const totalReturnValue = returnData.return_items.reduce((sum: number, item: any) => sum + item.total_price, 0);
+  const totalExchangeValue = returnData.exchange_items.reduce((sum: number, item: any) => sum + item.total_price, 0);
+  const balanceAmount = totalExchangeValue - totalReturnValue;
+  
+  console.log('\n--- FINANCIAL SUMMARY ---');
+  console.log(`Total Return Value: ₹${totalReturnValue}`);
+  console.log(`Total Exchange Value: ₹${totalExchangeValue}`);
+  console.log(`Balance Amount: ₹${balanceAmount}`);
+  console.log(`Balance Type: ${balanceAmount > 0 ? 'Customer Pays' : 'Customer Gets Change'}`);
+  
+  console.log('=== END DEBUG ===\n');
+};
+
+// Validate return data with detailed logging
+export const validateReturnDataWithLogging = (
+  originalBillId: number,
+  returnItems: ReturnItem[],
+  exchangeItems: ExchangeItem[]
+): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+  
+  console.log('=== VALIDATION DEBUG ===');
+  console.log('Original Bill ID:', originalBillId);
+  console.log('Return Items Count:', returnItems.length);
+  console.log('Exchange Items Count:', exchangeItems.length);
+  
+  if (!originalBillId || originalBillId <= 0) {
+    errors.push('Valid original bill ID is required');
+  }
+  
+  if (returnItems.length === 0) {
+    errors.push('At least one item must be selected for return');
+  }
+  
+  if (exchangeItems.length === 0) {
+    errors.push('At least one item must be selected for exchange');
+  }
+  
+  // Validate return items
+  returnItems.forEach((item, index) => {
+    console.log(`Validating return item ${index + 1}:`, item);
+    if (!item.product_name || item.product_name.trim() === '') {
+      errors.push(`Return item ${index + 1}: Product name is required`);
+    }
+    if (item.quantity <= 0) {
+      errors.push(`Return item ${index + 1}: Quantity must be greater than 0`);
+    }
+    if (item.unit_price < 0) {
+      errors.push(`Return item ${index + 1}: Unit price cannot be negative`);
+    }
+    const calculatedTotal = item.quantity * item.unit_price;
+    if (Math.abs(calculatedTotal - item.total_price) > 0.01) {
+      errors.push(`Return item ${index + 1}: Total price mismatch (calculated: ${calculatedTotal}, provided: ${item.total_price})`);
+    }
+  });
+  
+  // Validate exchange items
+  exchangeItems.forEach((item, index) => {
+    console.log(`Validating exchange item ${index + 1}:`, item);
+    if (!item.product_name || item.product_name.trim() === '') {
+      errors.push(`Exchange item ${index + 1}: Product name is required`);
+    }
+    if (item.quantity <= 0) {
+      errors.push(`Exchange item ${index + 1}: Quantity must be greater than 0`);
+    }
+    if (item.unit_price < 0) {
+      errors.push(`Exchange item ${index + 1}: Unit price cannot be negative`);
+    }
+    const calculatedTotal = item.quantity * item.unit_price;
+    if (Math.abs(calculatedTotal - item.total_price) > 0.01) {
+      errors.push(`Exchange item ${index + 1}: Total price mismatch (calculated: ${calculatedTotal}, provided: ${item.total_price})`);
+    }
+  });
+  
+  console.log('Validation errors:', errors);
+  console.log('=== END VALIDATION DEBUG ===\n');
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};

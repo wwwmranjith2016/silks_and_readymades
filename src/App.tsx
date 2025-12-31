@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Navbar from './components/common/Navbar';
 import Dashboard from './components/dashboard/Dashboard';
 import BillingScreen from './components/billing/BillingScreen';
+import ReturnScreen from './components/returns/ReturnScreen';
 import ProductList from './components/products/ProductList';
 import BillsHistory from './components/bills/BillsHistory';
 import Reports from './components/reports/Reports';
@@ -18,6 +19,8 @@ function App() {
         return <Dashboard />;
       case 'billing':
         return <BillingScreen />;
+      case 'returns':
+        return <ReturnScreen />;
       case 'products':
         return <ProductList />;
       case 'bills':

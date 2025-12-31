@@ -9,6 +9,7 @@ const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'billing', label: 'New Bill', icon: '🧾' },
+    { id: 'returns', label: 'Returns', icon: '🔄' },
     { id: 'products', label: 'Products', icon: '📦' },
     { id: 'bills', label: 'Bills History', icon: '📋' },
     { id: 'reports', label: 'Reports', icon: '📈' },

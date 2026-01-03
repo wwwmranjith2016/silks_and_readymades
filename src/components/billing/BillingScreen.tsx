@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SampleReceipt from './SampleReceipt';
 import { useToast } from '../common/ToastContext';
+import { getShopInfo } from '../../utils/shopSettings';
 
 interface CartItem {
   product_id: number;
@@ -479,12 +480,6 @@ const BillingScreen: React.FC = () => {
                 Clear
               </button>
             </div>
-            <button
-              onClick={() => window.location.hash = '#/returns'}
-              className="w-full py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700"
-            >
-              🔄 Process Return
-            </button>
           </div>
         </div>
       </div>
@@ -507,12 +502,7 @@ const BillingScreen: React.FC = () => {
             <div className="p-4">
               <SampleReceipt 
                 billData={generatePreviewData()}
-                shopInfo={{
-                  shop_name: 'Silks & Readymades',
-                  owner_name: 'Retail Store',
-                  address: '123 Main Street, City, State 12345',
-                  phone: '+91 9876543210'
-                }}
+                shopInfo={getShopInfo()}
               />
             </div>
             <div className="p-4 border-t bg-gray-50">

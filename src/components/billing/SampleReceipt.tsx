@@ -1,4 +1,5 @@
 import React from 'react';
+import { getShopInfo, getShopSettings } from '../../utils/shopSettings';
 
 interface SampleReceiptProps {
   billData?: any;
@@ -14,10 +15,19 @@ const SampleReceipt: React.FC<SampleReceiptProps> = ({
       <div className="font-mono text-sm bg-gray-50 p-4 rounded border-2 border-dashed border-gray-300">
         {/* Header */}
         <div className="text-center mb-4">
-          <div className="font-bold text-lg">{shopInfo.shop_name || 'My Shop'}</div>
-          {shopInfo.owner_name && (
-            <div>{shopInfo.owner_name}</div>
+          {getShopSettings().receiptSettings.includeLogo && getShopSettings().logo && (
+            <div className="mb-2">
+              <img 
+                src={getShopSettings().logo} 
+                alt="Shop Logo" 
+                className="h-12 w-12 object-contain mx-auto"
+              />
+            </div>
           )}
+          <div className="font-bold text-lg">{shopInfo.shop_name || 'My Shop'}</div>
+          {/* {shopInfo.owner_name && (
+            <div>{shopInfo.owner_name}</div>
+          )} */}
           {shopInfo.address && (
             <div className="text-xs">{shopInfo.address}</div>
           )}
@@ -96,7 +106,7 @@ const SampleReceipt: React.FC<SampleReceiptProps> = ({
 
         {/* Footer */}
         <div className="text-center">
-          <div>Thank you for your business!</div>
+          <div>{getShopSettings().receiptSettings.footerMessage || 'Thank you for your business!'}</div>
           <div>Please visit again</div>
           <div className="mt-4 text-xs text-gray-500">
             This is a sample receipt for preview purposes
@@ -163,12 +173,7 @@ function getDefaultBillData() {
 }
 
 function getDefaultShopInfo() {
-  return {
-    shop_name: 'Silks & Readymades',
-    owner_name: 'Retail Store',
-    address: '123 Main Street, City, State 12345',
-    phone: '+91 9876543210'
-  };
+  return getShopInfo();
 }
 
 function formatDate(dateString: string): string {

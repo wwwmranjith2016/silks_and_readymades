@@ -9,6 +9,8 @@ const ProductList: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [editProduct, setEditProduct] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const [showLabelPrint, setShowLabelPrint] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const { showToast } = useToast();
@@ -31,18 +33,21 @@ const ProductList: React.FC = () => {
     }
   };
 
-  const handleSearch = async () => {
-    if (searchQuery.trim()) {
-      try {
-        const result = await (window as any).electron.products.search(searchQuery);
-        if (result.success) {
-          setProducts(result.data);
-        }
-      } catch (error) {
-        showToast('Error searching: ' + error, 'error');
+  // Search products in real-time
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query);
+    if (query.length >= 2) {
+      const result = await (window as any).electron.products.search(query);
+      if (result.success) {
+        setSearchResults(result.data);
+        setShowSearchResults(true);
       }
     } else {
-      loadProducts();
+      setSearchResults([]);
+      setShowSearchResults(false);
+      if (query.length === 0) {
+        loadProducts();
+      }
     }
   };
 
@@ -91,27 +96,54 @@ const ProductList: React.FC = () => {
       </div>
 
       {/* Search */}
-      <div className="mb-4 flex gap-2">
+      <div className="mb-4 relative">
         <input
           type="text"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+          onChange={(e) => handleSearch(e.target.value)}
+          onFocus={() => searchQuery.length >= 2 && searchResults.length > 0 && setShowSearchResults(true)}
           placeholder="Search by name, barcode, or code..."
-          className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        <button
-          onClick={handleSearch}
-          className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
-        >
-          🔍 Search
-        </button>
-        <button
-          onClick={loadProducts}
-          className="px-4 py-2 bg-gray-400 text-white rounded-md hover:bg-gray-500"
-        >
-          Clear
-        </button>
+        
+        {/* Search Results Dropdown */}
+        {showSearchResults && searchResults.length > 0 && (
+          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+            {searchResults.map((product) => (
+              <div
+                key={product.product_id}
+                onClick={() => {
+                  // Select product from search results
+                  setProducts([product]);
+                  setSearchResults([]);
+                  setShowSearchResults(false);
+                  setSearchQuery(product.product_name);
+                }}
+                className="p-3 hover:bg-blue-50 cursor-pointer border-b"
+              >
+                <div className="font-semibold">{product.product_name}</div>
+                <div className="text-sm text-gray-600">
+                  {product.barcode} | ₹{product.selling_price} | Stock: {product.stock_quantity}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* Clear Search Button */}
+        {searchQuery && (
+          <button
+            onClick={() => {
+              setSearchQuery('');
+              setSearchResults([]);
+              setShowSearchResults(false);
+              loadProducts();
+            }}
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       {/* Products Table */}
@@ -135,39 +167,47 @@ const ProductList: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {products.map((product) => (
-                <tr key={product.product_id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm text-gray-900">{product.barcode}</td>
-                  <td className="px-6 py-4 text-sm text-gray-900">{product.product_name}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{product.category}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    <span className={product.stock_quantity <= product.min_stock_level ? 'text-red-600 font-semibold' : ''}>
-                      {product.stock_quantity}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">₹{product.selling_price}</td>
-                  <td className="px-6 py-4 text-sm">
-                    <button
-                      onClick={() => handleEdit(product)}
-                      className="text-blue-600 hover:text-blue-800 mr-3"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handlePrintLabel(product)}
-                      className="text-green-600 hover:text-green-800 mr-3"
-                    >
-                      Print Label
-                    </button>
-                    <button
-                      onClick={() => handleDelete(product.product_id)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      Delete
-                    </button>
+              {products.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                    {searchQuery ? 'No products found matching your search.' : 'No products found. Click "Add Product" to create your first product.'}
                   </td>
                 </tr>
-              ))}
+              ) : (
+                products.map((product) => (
+                  <tr key={product.product_id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm text-gray-900">{product.barcode}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{product.product_name}</td>
+                    <td className="px-6 py-4 text-sm text-gray-500">{product.category}</td>
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      <span className={product.stock_quantity <= product.min_stock_level ? 'text-red-600 font-semibold' : ''}>
+                        {product.stock_quantity}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">₹{product.selling_price}</td>
+                    <td className="px-6 py-4 text-sm">
+                      <button
+                        onClick={() => handleEdit(product)}
+                        className="text-blue-600 hover:text-blue-800 mr-3"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handlePrintLabel(product)}
+                        className="text-green-600 hover:text-green-800 mr-3"
+                      >
+                        Print Label
+                      </button>
+                      <button
+                        onClick={() => handleDelete(product.product_id)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

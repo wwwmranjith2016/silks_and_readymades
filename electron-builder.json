@@ -1,6 +1,6 @@
 {
-  "appId": "com.billing.app",
-  "productName": "Billing Software",
+  "appId": "com.ra.billing.software",
+  "productName": "RA BILLING SOFTWARE",
   "directories": {
     "output": "dist-installer"
   },

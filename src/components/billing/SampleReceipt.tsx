@@ -10,29 +10,34 @@ const SampleReceipt: React.FC<SampleReceiptProps> = ({
   billData = getDefaultBillData(), 
   shopInfo = getDefaultShopInfo() 
 }) => {
+  // Ensure shopInfo has all required fields
+  const settings = getShopSettings();
+  const info = shopInfo || {};
+  const logo = info.logo || settings.logo || '';
+  const includeLogo = info.include_logo !== false ? info.include_logo : settings.receiptSettings.includeLogo;
+  const footerMessage = info.footer_message || settings.receiptSettings.footerMessage || 'Thank you for your business!';
+  
   return (
     <div className="bg-white p-6 rounded-lg shadow-lg max-w-md mx-auto">
       <div className="font-mono text-sm bg-gray-50 p-4 rounded border-2 border-dashed border-gray-300">
         {/* Header */}
         <div className="text-center mb-4">
-          {getShopSettings().receiptSettings.includeLogo && getShopSettings().logo && (
+          {includeLogo && logo && (
             <div className="mb-2">
               <img 
-                src={getShopSettings().logo} 
+                src={logo} 
                 alt="Shop Logo" 
-                className="h-12 w-12 object-contain mx-auto"
+                className="h-16 w-auto object-contain mx-auto"
+                style={{ maxWidth: '100px' }}
               />
             </div>
           )}
-          <div className="font-bold text-lg">{shopInfo.shop_name || 'My Shop'}</div>
-          {/* {shopInfo.owner_name && (
-            <div>{shopInfo.owner_name}</div>
-          )} */}
-          {shopInfo.address && (
-            <div className="text-xs">{shopInfo.address}</div>
+          <div className="font-bold text-lg">{info.shop_name || settings.shopName || 'My Shop'}</div>
+          {info.address && (
+            <div className="text-xs">{info.address}</div>
           )}
-          {shopInfo.phone && (
-            <div className="text-xs">Phone: {shopInfo.phone}</div>
+          {info.phone && (
+            <div className="text-xs">Phone: {info.phone}</div>
           )}
         </div>
 
@@ -106,11 +111,13 @@ const SampleReceipt: React.FC<SampleReceiptProps> = ({
 
         {/* Footer */}
         <div className="text-center">
-          <div>{getShopSettings().receiptSettings.footerMessage || 'Thank you for your business!'}</div>
+          <div>{footerMessage}</div>
           <div>Please visit again</div>
-          <div className="mt-4 text-xs text-gray-500">
-            This is a sample receipt for preview purposes
-          </div>
+          {billData.bill_number === 'BILL-001' && (
+            <div className="mt-4 text-xs text-gray-500">
+              This is a sample receipt for preview purposes
+            </div>
+          )}
         </div>
       </div>
     </div>

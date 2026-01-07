@@ -39,8 +39,14 @@ export const getShopInfo = () => {
   const settings = getShopSettings();
   return {
     shop_name: settings.shopName,
-    owner_name: settings.shopName, // Using shop name as owner name for simplicity
+    owner_name: settings.shopName,
     address: settings.address,
-    phone: settings.phone
+    phone: settings.phone,
+    logo: settings.logo,
+    footer_message: settings.receiptSettings.footerMessage,
+    include_logo: settings.receiptSettings.includeLogo,
+    show_customer_info: settings.receiptSettings.showCustomerInfo,
+    show_terms: settings.receiptSettings.showTerms,
+    terms_text: settings.receiptSettings.termsText
   };
 };

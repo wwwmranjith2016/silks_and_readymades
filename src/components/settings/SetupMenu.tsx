@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useToast } from '../common/ToastContext';
 import SampleReceipt from '../billing/SampleReceipt';
 
-interface ShopInfo {
-  shopName: string;
-  address: string;
-  phone: string;
-}
+// interface ShopInfo {
+//   shopName: string;
+//   address: string;
+//   phone: string;
+// }
 
 interface ReceiptSettings {
   includeLogo: boolean;

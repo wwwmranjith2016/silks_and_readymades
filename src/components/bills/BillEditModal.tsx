@@ -16,8 +16,8 @@ const BillEditModal: React.FC<BillEditModalProps> = ({ isOpen, onClose, onSucces
     comment: '',
     paid_amount: ''
   });
-  const [showPaidConfirm, setShowPaidConfirm] = useState(false);
-  const [originalPaidAmount, setOriginalPaidAmount] = useState('');
+  // const [showPaidConfirm, setShowPaidConfirm] = useState(false);
+  // const [ setOriginalPaidAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const { showToast } = useToast();
 
@@ -30,7 +30,7 @@ const BillEditModal: React.FC<BillEditModalProps> = ({ isOpen, onClose, onSucces
         comment: bill.comment || '',
         paid_amount: bill.paid_amount?.toString() || ''
       });
-      setOriginalPaidAmount(bill.paid_amount?.toString() || '');
+      // setOriginalPaidAmount(bill.paid_amount?.toString() || '');
     }
   }, [bill]);
 

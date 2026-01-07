@@ -3,6 +3,7 @@ const path = require('path');
 const DatabaseManager = require('./database/db/db.js');
 const BarcodeGenerator = require('./barcode/barcode-generator');
 const ThermalPrinter = require('./thermal-printer/thermal-printer');
+const StandardPrinter = require('./standard-printer/standard-printer');
 
 let mainWindow;
 let dbManager;
@@ -34,7 +35,8 @@ async function createWindow() {
   barcodeGenerator = new BarcodeGenerator();
 
   // Initialize thermal printer
-  thermalPrinter = new ThermalPrinter();
+  // thermalPrinter = new ThermalPrinter();
+  thermalPrinter = new StandardPrinter();
 
   // Add sample data if database is empty
   await addSampleData();
@@ -114,8 +116,16 @@ async function createWindow() {
   }
 
   // Load app
+  // Check if running in production or development
+if (app.isPackaged) {
+  // Production - load from built files
+  mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+} else {
+  // Development - load from vite dev server
   mainWindow.loadURL('http://localhost:5173');
   mainWindow.webContents.openDevTools();
+}
+  // mainWindow.webContents.openDevTools();
 }
 
 function setupIPCHandlers() {
@@ -347,14 +357,25 @@ function setupIPCHandlers() {
   });
 
   // Print bill
-  ipcMain.handle('printer:printBill', async (event, billData) => {
+  ipcMain.handle('printer:printBill', async (event, billData, shopInfo) => {
     try {
-      // Get shop info for bill template
-      const shopInfo = dbManager.get('SELECT * FROM shop_info WHERE shop_id = 1');
+      console.log('printBill called with shopInfo:', shopInfo);
       
-      const result = await thermalPrinter.printBill(billData, shopInfo);
+      // Use shopInfo passed from renderer (from localStorage)
+      // If not provided, create a default object
+      const finalShopInfo = shopInfo || {
+        shop_name: 'My Shop',
+        address: '',
+        phone: '',
+        logo: '',
+        footer_message: 'Thank you for your business!',
+        include_logo: true
+      };
+      
+      const result = await thermalPrinter.printBill(billData, finalShopInfo);
       return result;
     } catch (error) {
+      console.error('Print bill error:', error);
       return { success: false, error: error.message };
     }
   });

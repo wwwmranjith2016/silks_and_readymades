@@ -25,6 +25,7 @@ const BillingScreen: React.FC = () => {
   const [lastScan, setLastScan] = useState('');
   const [printerStatus, setPrinterStatus] = useState<any>(null);
   const [showReceiptPreview, setShowReceiptPreview] = useState(false);
+  const [pendingBillData, setPendingBillData] = useState<any>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
 
@@ -172,7 +173,8 @@ const BillingScreen: React.FC = () => {
     }
 
     try {
-      const printResult = await (window as any).electron.printer.printBill(billData);
+      const shopInfo = getShopInfo();
+      const printResult = await (window as any).electron.printer.printBill(billData, shopInfo);
       if (printResult.success) {
         return { success: true, message: 'Bill created and printed successfully' };
       } else {
@@ -224,29 +226,45 @@ const BillingScreen: React.FC = () => {
           bill_number: result.billNumber,
           bill_date: new Date().toISOString()
         };
-
-        // Print the bill
-        const printResult = await printBill(billForPrint);
-        console.log("printResult:", printResult.message);
         
-        showToast(`${printResult.message}! Bill: ${result.billNumber}`, 'success');
-
-        // Clear cart
-        setCart([]);
-        setDiscountPercent(0);
-        setCustomerName('');
-        setCustomerPhone('');
-        setPaymentMode('CASH');
-        setSearchQuery('');        // ← Add this
-        setSearchResults([]);      // ← Add this  
-        setShowSearchResults(false); // ← Add this
-        console.log('Cart and search cleared after bill processing.');
+        // Store pending bill and show preview
+        setPendingBillData(billForPrint);
+        setShowReceiptPreview(true);
+        
+        showToast('Bill created! Review and print.', 'info');
+        setProcessing(false);
       } else {
         showToast('Error creating bill: ' + result.error, 'error');
+        setProcessing(false);
       }
     } catch (error) {
       showToast('Error: ' + error, 'error');
-    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Confirm and print from preview
+  const confirmAndPrint = async () => {
+    setShowReceiptPreview(false);
+    
+    if (pendingBillData) {
+      setProcessing(true);
+      const printResult = await printBill(pendingBillData);
+      console.log("printResult:", printResult.message);
+      
+      showToast(`${printResult.message}! Bill: ${pendingBillData.bill_number}`, 'success');
+      
+      // Clear cart
+      setCart([]);
+      setDiscountPercent(0);
+      setCustomerName('');
+      setCustomerPhone('');
+      setPaymentMode('CASH');
+      setSearchQuery('');
+      setSearchResults([]);
+      setShowSearchResults(false);
+      setPendingBillData(null);
+      console.log('Cart and search cleared after bill processing.');
       setProcessing(false);
     }
   };
@@ -490,9 +508,12 @@ const BillingScreen: React.FC = () => {
           <div className="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-auto">
             <div className="p-4 border-b">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold">Receipt Preview</h2>
+                <h2 className="text-xl font-bold">Bill Preview</h2>
                 <button
-                  onClick={() => setShowReceiptPreview(false)}
+                  onClick={() => {
+                    setShowReceiptPreview(false);
+                    setPendingBillData(null);
+                  }}
                   className="text-gray-500 hover:text-gray-700 text-2xl"
                 >
                   ×
@@ -501,25 +522,27 @@ const BillingScreen: React.FC = () => {
             </div>
             <div className="p-4">
               <SampleReceipt 
-                billData={generatePreviewData()}
+                billData={pendingBillData || generatePreviewData()}
                 shopInfo={getShopInfo()}
               />
             </div>
             <div className="p-4 border-t bg-gray-50">
               <div className="flex gap-2">
                 <button
-                  onClick={() => {
-                    window.print();
-                  }}
-                  className="flex-1 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  onClick={confirmAndPrint}
+                  disabled={processing}
+                  className="flex-1 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400"
                 >
-                  🖨️ Print Preview
+                  🖨️ Print Bill
                 </button>
                 <button
-                  onClick={() => setShowReceiptPreview(false)}
-                  className="flex-1 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+                  onClick={() => {
+                    setShowReceiptPreview(false);
+                    setPendingBillData(null);
+                  }}
+                  className="flex-1 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
                 >
-                  Close
+                  Cancel
                 </button>
               </div>
             </div>

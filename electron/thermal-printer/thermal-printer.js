@@ -448,6 +448,57 @@ ${bodyContent}
   }
 
   /**
+   * Generate barcode commands for thermal printer
+   */
+  generateBarcodeCommands(barcodeValue) {
+    let commands = Buffer.alloc(0);
+    
+    try {
+      // Set barcode height (0x1D, 0x68, 0xNN) - NN is height in dots
+      const barcodeHeight = Buffer.from([0x1D, 0x68, 0x40]); // 64 dots height
+      commands = Buffer.concat([commands, barcodeHeight]);
+      
+      // Set barcode width (0x1D, 0x77, 0xNN) - NN is width multiplier
+      const barcodeWidth = Buffer.from([0x1D, 0x77, 0x02]); // 2x width
+      commands = Buffer.concat([commands, barcodeWidth]);
+      
+      // Set HRI (Human Readable Interpretation) position
+      // 0x1D, 0x48, 0x00 = No HRI
+      // 0x1D, 0x48, 0x01 = HRI above barcode
+      // 0x1D, 0x48, 0x02 = HRI below barcode
+      // 0x1D, 0x48, 0x03 = HRI both above and below
+      const hriPosition = Buffer.from([0x1D, 0x48, 0x02]); // HRI below barcode
+      commands = Buffer.concat([commands, hriPosition]);
+      
+      // Start CODE128 barcode command
+      // GS k m d1...dk NUL - Print barcode
+      // m = 0x04 for CODE128
+      const barcodeData = Buffer.from(barcodeValue, 'utf8');
+      
+      // Build the complete barcode command
+      const barcodeStart = Buffer.from([0x1D, 0x6B, 0x04]); // Start CODE128 barcode
+      commands = Buffer.concat([commands, barcodeStart]);
+      
+      // Add barcode data length and data
+      const lengthByte = Buffer.from([barcodeData.length]);
+      commands = Buffer.concat([commands, lengthByte, barcodeData]);
+      
+      // Add NUL terminator
+      const terminator = Buffer.from([0x00]);
+      commands = Buffer.concat([commands, terminator]);
+      
+      // Add line break after barcode
+      commands = Buffer.concat([commands, Buffer.from([0x0A])]);
+      
+      return commands;
+    } catch (error) {
+      console.error('Error generating barcode commands:', error);
+      // Fallback to printing barcode as text
+      return this.formatText({ text: barcodeValue, bold: false });
+    }
+  }
+
+  /**
    * Execute system command
    */
   executeCommand(command) {
@@ -643,6 +694,274 @@ ${bodyContent}
     }
     
     return lines.join('\n');
+  }
+
+  /**
+   * Get available label sizes
+   */
+  getLabelSizes() {
+    return [
+      { id: '2x1', name: '2 x 1 inch', width: 200, height: 100 },
+      { id: '3x1', name: '3 x 1 inch', width: 300, height: 100 },
+      { id: '4x6', name: '4 x 6 inch', width: 400, height: 600 }
+    ];
+  }
+
+  /**
+   * Get available label templates
+   */
+  getLabelTemplates() {
+    return [
+      {
+        id: 'basic',
+        name: 'Basic',
+        description: 'Product name, price, and barcode',
+        fields: ['name', 'price', 'barcode']
+      },
+      {
+        id: 'detailed',
+        name: 'Detailed',
+        description: 'Name, category, price, stock, and barcode',
+        fields: ['name', 'category', 'price', 'stock', 'barcode']
+      },
+      {
+        id: 'minimal',
+        name: 'Minimal',
+        description: 'Just product name and barcode',
+        fields: ['name', 'barcode']
+      },
+      {
+        id: 'price',
+        name: 'Price Focus',
+        description: 'Large price, small name, and barcode',
+        fields: ['price', 'name', 'barcode']
+      }
+    ];
+  }
+
+  /**
+   * Print single product label
+   */
+  async printLabel(productData, labelSettings = {}) {
+    try {
+      if (!this.isConnected) {
+        return { success: false, error: 'Printer not connected' };
+      }
+
+      // Default label settings
+      const settings = {
+        size: '2x1',
+        quantity: 1,
+        template: 'basic',
+        ...labelSettings
+      };
+
+      // Build label content with template
+      const labelContent = this.buildLabelContent(productData, settings.template);
+      
+      // Convert to ESC/POS commands for labels
+      const escPosData = this.convertLabelToESCPOS(labelContent, settings);
+      
+      // Send to printer
+      const result = await this.sendToPrinter(escPosData);
+      
+      if (result.success) {
+        console.log(`Label for ${productData.product_name} printed successfully`);
+        return { success: true, message: 'Label printed successfully' };
+      } else {
+        return result;
+      }
+    } catch (error) {
+      console.error('Label printing error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Print multiple labels (bulk printing)
+   */
+  async printLabels(productsData, labelSettings = {}) {
+    try {
+      if (!this.isConnected) {
+        return { success: false, error: 'Printer not connected' };
+      }
+
+      if (!productsData || productsData.length === 0) {
+        return { success: false, error: 'No products to print' };
+      }
+
+      // Default label settings
+      const settings = {
+        size: '2x1',
+        template: 'basic',
+        ...labelSettings
+      };
+
+      let successCount = 0;
+      let errorCount = 0;
+      const errors = [];
+
+      for (const productData of productsData) {
+        try {
+          const quantity = productData.labelQuantity || 1;
+          
+          for (let i = 0; i < quantity; i++) {
+            // Build label content with template
+            const labelContent = this.buildLabelContent(productData, settings.template);
+            
+            // Convert to ESC/POS commands for labels
+            const escPosData = this.convertLabelToESCPOS(labelContent, settings);
+            
+            // Send to printer
+            const result = await this.sendToPrinter(escPosData);
+            
+            if (result.success) {
+              successCount++;
+            } else {
+              errorCount++;
+              errors.push(`Failed to print label for ${productData.product_name}: ${result.error}`);
+            }
+            
+            // Small delay between labels to prevent printer buffer overflow
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        } catch (error) {
+          errorCount++;
+          errors.push(`Error printing label for ${productData.product_name}: ${error.message}`);
+        }
+      }
+
+      const message = `Bulk printing completed: ${successCount} successful, ${errorCount} failed`;
+      console.log(message);
+      
+      return { 
+        success: errorCount === 0, 
+        message,
+        successCount,
+        errorCount,
+        errors: errors.length > 0 ? errors : undefined
+      };
+    } catch (error) {
+      console.error('Bulk label printing error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Build label content for product with template
+   */
+  buildLabelContent(productData, templateId = 'basic') {
+    const templates = {
+      basic: this.buildBasicTemplate(productData),
+      detailed: this.buildDetailedTemplate(productData),
+      minimal: this.buildMinimalTemplate(productData),
+      price: this.buildPriceTemplate(productData)
+    };
+    
+    return templates[templateId] || templates.basic;
+  }
+
+  /**
+   * Basic template: Name + Price + Barcode
+   */
+  buildBasicTemplate(productData) {
+    const lines = [];
+    const maxNameLength = 20;
+    const productName = productData.product_name.length > maxNameLength 
+      ? productData.product_name.substring(0, maxNameLength - 3) + '...'
+      : productData.product_name;
+    
+    lines.push({ type: 'center', text: productName, bold: true });
+    lines.push({ type: 'center', text: `₹${parseFloat(productData.selling_price).toFixed(2)}`, bold: true });
+    lines.push({ type: 'barcode', barcode: productData.barcode });
+    
+    return lines;
+  }
+
+  /**
+   * Detailed template: Name + Category + Price + Barcode + Stock
+   */
+  buildDetailedTemplate(productData) {
+    const lines = [];
+    const maxNameLength = 18;
+    const productName = productData.product_name.length > maxNameLength 
+      ? productData.product_name.substring(0, maxNameLength - 3) + '...'
+      : productData.product_name;
+    
+    lines.push({ type: 'center', text: productName, bold: true });
+    lines.push({ type: 'center', text: productData.category || 'General', fontSize: 'small' });
+    lines.push({ type: 'center', text: `₹${parseFloat(productData.selling_price).toFixed(2)}`, bold: true });
+    lines.push({ type: 'center', text: `Stock: ${productData.stock_quantity || 0}`, fontSize: 'small' });
+    lines.push({ type: 'barcode', barcode: productData.barcode });
+    
+    return lines;
+  }
+
+  /**
+   * Minimal template: Just Name + Barcode
+   */
+  buildMinimalTemplate(productData) {
+    const lines = [];
+    const maxNameLength = 25;
+    const productName = productData.product_name.length > maxNameLength 
+      ? productData.product_name.substring(0, maxNameLength - 3) + '...'
+      : productData.product_name;
+    
+    lines.push({ type: 'center', text: productName, bold: true });
+    lines.push({ type: 'barcode', barcode: productData.barcode });
+    
+    return lines;
+  }
+
+  /**
+   * Price template: Large Price + Name (small) + Barcode
+   */
+  buildPriceTemplate(productData) {
+    const lines = [];
+    const maxNameLength = 15;
+    const productName = productData.product_name.length > maxNameLength 
+      ? productData.product_name.substring(0, maxNameLength - 3) + '...'
+      : productData.product_name;
+    
+    lines.push({ type: 'center', text: `₹${parseFloat(productData.selling_price).toFixed(2)}`, bold: true, fontSize: 'large' });
+    lines.push({ type: 'center', text: productName, fontSize: 'small' });
+    lines.push({ type: 'barcode', barcode: productData.barcode });
+    
+    return lines;
+  }
+
+  /**
+   * Convert label content to ESC/POS commands
+   */
+  convertLabelToESCPOS(content, settings) {
+    let commands = Buffer.alloc(0);
+    
+    // Initialize printer
+    const init = Buffer.from([0x1B, 0x40]);
+    commands = Buffer.concat([commands, init]);
+    
+    // Set smaller font for labels (2x1 inch)
+    const smallFont = Buffer.from([0x1D, 0x21, 0x01]); // Double height, normal width
+    commands = Buffer.concat([commands, smallFont]);
+    
+    content.forEach(line => {
+      switch (line.type) {
+        case 'center':
+          commands = Buffer.concat([commands, this.escapeSequence('CENTER')]);
+          commands = Buffer.concat([commands, this.formatText(line)]);
+          break;
+        case 'barcode':
+          // Generate actual barcode using ESC/POS commands
+          commands = Buffer.concat([commands, this.generateBarcodeCommands(line.barcode)]);
+          break;
+      }
+      
+      // Add line break
+      commands = Buffer.concat([commands, Buffer.from([0x0A])]);
+    });
+    
+    // No paper cut for labels
+    return commands;
   }
 
   /**

@@ -41,6 +41,9 @@ async function createWindow() {
   // Add sample data if database is empty
   await addSampleData();
 
+  // Add sample data if database is empty
+  await addSampleData();
+
   // Setup IPC handlers
   setupIPCHandlers();
 
@@ -376,6 +379,48 @@ function setupIPCHandlers() {
       return result;
     } catch (error) {
       console.error('Print bill error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // ===== LABEL PRINTING HANDLERS =====
+  
+  // Print single label
+  ipcMain.handle('label:print', async (event, productData, labelSettings) => {
+    try {
+      const result = await thermalPrinter.printLabel(productData, labelSettings);
+      return result;
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Print multiple labels (bulk printing)
+  ipcMain.handle('label:printBulk', async (event, productsData, labelSettings) => {
+    try {
+      const result = await thermalPrinter.printLabels(productsData, labelSettings);
+      return result;
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Get available label sizes
+  ipcMain.handle('label:getSizes', async () => {
+    try {
+      const sizes = thermalPrinter.getLabelSizes();
+      return { success: true, data: sizes };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Get available label templates
+  ipcMain.handle('label:getTemplates', async () => {
+    try {
+      const templates = thermalPrinter.getLabelTemplates();
+      return { success: true, data: templates };
+    } catch (error) {
       return { success: false, error: error.message };
     }
   });

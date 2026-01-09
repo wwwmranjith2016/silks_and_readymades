@@ -98,51 +98,6 @@ const BillsHistory: React.FC = () => {
     }).format(amount);
   };
 
-  const handlePrintBill = async (bill: any) => {
-    try {
-      // Get the full bill details for printing
-      const result = await (window as any).electron.bills.getById(bill.bill_id);
-      if (result.success) {
-        const billData = result.data;
-        
-        // Format the bill data for printing
-        const printData = {
-          bill_number: billData.bill_number,
-          bill_date: billData.bill_date,
-          customer_name: billData.customer_name || null,
-          customer_phone: billData.customer_phone || null,
-          subtotal: billData.subtotal,
-          discount_amount: billData.discount_amount,
-          discount_percentage: billData.discount_percentage,
-          total_amount: billData.total_amount,
-          payment_mode: billData.payment_mode,
-          paid_amount: billData.paid_amount,
-          balance_amount: billData.balance_amount,
-          items: billData.items.map((item: any) => ({
-            product_id: item.product_id,
-            product_name: item.product_name,
-            barcode: item.barcode || '',
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            total_price: item.total_price
-          }))
-        };
-
-        // Print the bill using the same system as billing screen
-        const printResult = await (window as any).electron.printer.printBill(printData);
-        if (printResult.success) {
-          showToast('Bill printed successfully', 'success');
-        } else {
-          showToast('Print failed: ' + printResult.error, 'error');
-        }
-      } else {
-        showToast('Error loading bill for printing: ' + result.error, 'error');
-      }
-    } catch (error) {
-      showToast('Error printing bill: ' + error, 'error');
-    }
-  };
-
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
@@ -276,33 +231,19 @@ const BillsHistory: React.FC = () => {
                     )}
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <div className="flex justify-center gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePrintBill(bill);
-                        }}
-                        className="text-green-600 hover:text-green-800 hover:bg-green-50 p-1 rounded transition-colors"
-                        title="Print Bill"
-                      >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedBill(bill);
-                          setShowEditModal(true);
-                        }}
-                        className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1 rounded transition-colors"
-                        title="Edit Bill"
-                      >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
-                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedBill(bill);
+                        setShowEditModal(true);
+                      }}
+                      className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1 rounded transition-colors"
+                      title="Edit Bill"
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -434,16 +375,7 @@ const BillsHistory: React.FC = () => {
 
             {/* Modal Footer - Fixed */}
             <div className="flex-shrink-0 p-6 border-t bg-gray-50">
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => handlePrintBill(billDetails)}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"
-                >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                  </svg>
-                  Print Bill
-                </button>
+              <div className="flex justify-end">
                 <button
                   onClick={() => setShowBillModal(false)}
                   className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"

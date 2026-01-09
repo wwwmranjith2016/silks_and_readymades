@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useToast } from '../common/ToastContext';
 import { 
   ReturnItem, 
@@ -9,7 +9,7 @@ import {
 } from '../../types/returnTypes';
 import { 
   calculateReturnSummary, 
-  validateReturnData, 
+  // validateReturnData, 
   validateStockAvailability,
   formatCurrency,
   debugReturnTransaction,
@@ -63,7 +63,7 @@ const ReturnProcess: React.FC<ReturnProcessProps> = ({ onComplete, onCancel }) =
     setCustomerPhone(bill.customer_phone || '');
     
     // Pre-populate return items with all bill items
-    const prePopulatedReturnItems: ReturnItem[] = bill.items.map((item, index) => ({
+    const prePopulatedReturnItems: ReturnItem[] = bill.items.map((item) => ({
       return_item_id: 0,
       return_id: 0,
       product_id: item.product_id,
@@ -96,31 +96,31 @@ const ReturnProcess: React.FC<ReturnProcessProps> = ({ onComplete, onCancel }) =
   };
 
   // Add exchange item
-  const addExchangeItem = (product: any) => {
-    const existingIndex = exchangeItems.findIndex(item => item.product_id === product.product_id);
+  // const addExchangeItem = (product: any) => {
+  //   const existingIndex = exchangeItems.findIndex(item => item.product_id === product.product_id);
     
-    if (existingIndex >= 0) {
-      // Increase quantity
-      const updatedItems = [...exchangeItems];
-      updatedItems[existingIndex].quantity += 1;
-      updatedItems[existingIndex].total_price = updatedItems[existingIndex].quantity * updatedItems[existingIndex].unit_price;
-      setExchangeItems(updatedItems);
-    } else {
-      // Add new item
-      const newItem: ExchangeItem = {
-        exchange_item_id: 0,
-        return_id: 0,
-        product_id: product.product_id,
-        product_name: product.product_name,
-        product_code: product.product_code,
-        barcode: product.barcode,
-        quantity: 1,
-        unit_price: product.selling_price,
-        total_price: product.selling_price
-      };
-      setExchangeItems([...exchangeItems, newItem]);
-    }
-  };
+  //   if (existingIndex >= 0) {
+  //     // Increase quantity
+  //     const updatedItems = [...exchangeItems];
+  //     updatedItems[existingIndex].quantity += 1;
+  //     updatedItems[existingIndex].total_price = updatedItems[existingIndex].quantity * updatedItems[existingIndex].unit_price;
+  //     setExchangeItems(updatedItems);
+  //   } else {
+  //     // Add new item
+  //     const newItem: ExchangeItem = {
+  //       exchange_item_id: 0,
+  //       return_id: 0,
+  //       product_id: product.product_id,
+  //       product_name: product.product_name,
+  //       product_code: product.product_code,
+  //       barcode: product.barcode,
+  //       quantity: 1,
+  //       unit_price: product.selling_price,
+  //       total_price: product.selling_price
+  //     };
+  //     setExchangeItems([...exchangeItems, newItem]);
+  //   }
+  // };
 
   // Update exchange item quantity
   const updateExchangeItemQuantity = (index: number, newQuantity: number) => {
@@ -236,17 +236,17 @@ const ReturnProcess: React.FC<ReturnProcessProps> = ({ onComplete, onCancel }) =
   };
 
   // Search products for exchange
-  const searchExchangeProducts = async (query: string) => {
-    if (query.length < 2) return [];
+  // const searchExchangeProducts = async (query: string) => {
+  //   if (query.length < 2) return [];
     
-    try {
-      const result = await (window as any).electron.products.search(query);
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error('Error searching products:', error);
-      return [];
-    }
-  };
+  //   try {
+  //     const result = await (window as any).electron.products.search(query);
+  //     return result.success ? result.data : [];
+  //   } catch (error) {
+  //     console.error('Error searching products:', error);
+  //     return [];
+  //   }
+  // };
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">

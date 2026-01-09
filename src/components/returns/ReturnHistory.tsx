@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useToast } from '../common/ToastContext';
 import { ReturnWithItems, ReturnFilters } from '../../types/returnTypes';
-import { formatCurrency, formatDate, getReturnStatusBadgeColor, searchBills } from '../../utils/returnUtils';
+import { formatCurrency, formatDate, getReturnStatusBadgeColor } from '../../utils/returnUtils';
 
 interface ReturnHistoryProps {
   onBack: () => void;

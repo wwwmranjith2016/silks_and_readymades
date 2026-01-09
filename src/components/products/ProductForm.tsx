@@ -26,7 +26,14 @@ const ProductForm: React.FC<ProductFormProps> = ({ onSuccess, onCancel, editProd
 
   const [barcodeImage, setBarcodeImage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isTamilMode, setIsTamilMode] = useState(false);
   const { showToast } = useToast();
+
+  useEffect(() => {
+    // Load Tamil mode preference from localStorage
+    const savedTamilMode = localStorage.getItem('productFormTamilMode');
+    setIsTamilMode(savedTamilMode === 'true');
+  }, []);
 
   useEffect(() => {
     if (editProduct) {
@@ -86,6 +93,12 @@ const ProductForm: React.FC<ProductFormProps> = ({ onSuccess, onCancel, editProd
     }
   };
 
+  const toggleTamilMode = () => {
+    const newTamilMode = !isTamilMode;
+    setIsTamilMode(newTamilMode);
+    localStorage.setItem('productFormTamilMode', newTamilMode.toString());
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -129,21 +142,48 @@ const ProductForm: React.FC<ProductFormProps> = ({ onSuccess, onCancel, editProd
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
-          <h2 className="text-2xl font-bold mb-4">
-            {editProduct ? 'Edit Product' : 'Add New Product'}
-          </h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-bold">
+              {editProduct ? 'Edit Product' : 'Add New Product'}
+            </h2>
+            <button
+              onClick={onCancel}
+              className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+            >
+              ×
+            </button>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Product Name */}
             <div>
-              <label className="block text-sm font-medium mb-1">
-                Product Name <span className="text-red-500">*</span>
-              </label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="block text-sm font-medium">
+                  Product Name <span className="text-red-500">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={toggleTamilMode}
+                  className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                    isTamilMode 
+                      ? 'bg-orange-500 text-white' 
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  {isTamilMode ? 'தமிழ்' : 'English'}
+                </button>
+              </div>
               <input
                 type="text"
                 value={formData.product_name}
                 onChange={(e) => setFormData({ ...formData, product_name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                  isTamilMode 
+                    ? 'border-orange-300 focus:ring-orange-500 bg-orange-50' 
+                    : 'border-gray-300 focus:ring-blue-500'
+                }`}
+                placeholder={isTamilMode ? 'தமிழில் பொருள் பெயர் உள்ளிடவும்...' : 'Enter product name...'}
+                style={{ fontFamily: isTamilMode ? 'Noto Sans Tamil, Arial, sans-serif' : 'inherit' }}
                 required
               />
             </div>

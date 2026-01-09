@@ -35,8 +35,8 @@ async function createWindow() {
   barcodeGenerator = new BarcodeGenerator();
 
   // Initialize thermal printer
-  // thermalPrinter = new ThermalPrinter();
-  thermalPrinter = new StandardPrinter();
+  thermalPrinter = new ThermalPrinter();
+  // thermalPrinter = new StandardPrinter();
 
   // Add sample data if database is empty
   await addSampleData();

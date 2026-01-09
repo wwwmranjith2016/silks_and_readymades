@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../common/ToastContext';
+import { getShopInfo } from '../../utils/shopSettings';
 
 const PrinterSettings: React.FC = () => {
   const [availablePrinters, setAvailablePrinters] = useState<any[]>([]);
@@ -121,7 +122,8 @@ const PrinterSettings: React.FC = () => {
     };
 
     try {
-      const result = await (window as any).electron.printer.printBill(testBillData);
+      const shopInfo = getShopInfo();
+      const result = await (window as any).electron.printer.printBill(testBillData, shopInfo);
       if (result.success) {
         showToast('Test page printed successfully!', 'success');
       } else {
